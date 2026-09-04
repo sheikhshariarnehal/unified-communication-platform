@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, Suspense, useCallback } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -12,22 +12,25 @@ import {
   Users,
   ShieldCheck,
   SendHorizontal,
-  Calendar,
-  AlertCircle,
-  Globe,
   Download,
   CheckCircle2,
   ExternalLink,
   Copy,
   X,
   Play,
+  Pause,
   SkipForward,
   ChevronRight,
   ChevronLeft,
   Sparkles,
   Zap,
+  RefreshCw,
+  AlertCircle,
+  Clock,
+  Radio,
+  Sliders,
 } from "lucide-react";
-import { mockWhatsAppAccounts, mockWhatsAppTemplates } from "@/lib/whatsapp/service";
+import { mockWhatsAppAccounts } from "@/lib/whatsapp/service";
 import { mockLists, mockSegments, getLists, getListContacts } from "@/lib/contacts/service";
 import { ContactList, Contact } from "@/types/database";
 
@@ -51,33 +54,64 @@ function WizardContent() {
   const [campaignName, setCampaignName] = useState(initialName);
   const [dispatchMode, setDispatchMode] = useState<"web_runner" | "meta_api">("web_runner");
   const [accountId, setAccountId] = useState(mockWhatsAppAccounts[0].id);
-  const [templateId, setTemplateId] = useState(mockWhatsAppTemplates[0].id);
   const [audienceType, setAudienceType] = useState<"list" | "segment">(
     initialListId ? "list" : "segment"
   );
   const [audienceId, setAudienceId] = useState(initialListId || mockSegments[1].id);
   const [availableLists, setAvailableLists] = useState<ContactList[]>(mockLists);
 
+  // Templates
+  const [availableTemplates, setAvailableTemplates] = useState<any[]>([
+    {
+      id: "hello_world",
+      name: "hello_world",
+      category: "UTILITY",
+      language: "en_US",
+      status: "APPROVED",
+      body_text: "Welcome and congratulations! This message confirms that your WhatsApp Business Cloud API integration is live.",
+      isMetaDefault: true,
+    },
+    {
+      id: "order_shipping_update_v2",
+      name: "order_shipping_update_v2",
+      category: "UTILITY",
+      language: "en_US",
+      status: "APPROVED",
+      body_text: "Hello {{1}}, your order {{2}} has been shipped via express courier. Track: {{3}}",
+    },
+  ]);
+  const [selectedTemplateName, setSelectedTemplateName] = useState("hello_world");
+
   // Real Contacts State
   const [listContacts, setListContacts] = useState<Contact[]>([]);
   const [isLoadingContacts, setIsLoadingContacts] = useState(false);
+  const [contactSearchQuery, setContactSearchQuery] = useState("");
 
   // Custom Message Template for Direct WhatsApp Web Runner
   const [customMessage, setCustomMessage] = useState(
-    "Assalamu Alaikum {{businessName}},\n\nI found your store on Google Maps! We offer direct wholesale supply and exclusive discounts for {{category}} stores.\n\nWould you like me to send over our price catalog?"
+    "Assalamu Alaikum {{businessName}},\n\nI found your store on Google Maps! We offer direct wholesale supply and exclusive discounts for {{category}} stores in {{city}}.\n\nWould you like me to send over our price catalog?"
   );
 
   // Variable Mappings (Meta Cloud API mode)
-  const [var1, setVar1] = useState("first_name");
-  const [var2, setVar2] = useState("order_id");
-  const [var3, setVar3] = useState("tracking_url");
+  const [var1, setVar1] = useState("company");
+  const [var2, setVar2] = useState("category");
 
-  // Runner Modal State
+  // Web Runner State
   const [isRunnerOpen, setIsRunnerOpen] = useState(false);
   const [runnerIndex, setRunnerIndex] = useState(0);
   const [sentContactIds, setSentContactIds] = useState<string[]>([]);
   const [skippedContactIds, setSkippedContactIds] = useState<string[]>([]);
   const [copiedLink, setCopiedLink] = useState(false);
+
+  // Auto-Pacing State
+  const [isAutoPacing, setIsAutoPacing] = useState(false);
+  const [pacingIntervalSec, setPacingIntervalSec] = useState(5);
+  const [countdown, setCountdown] = useState<number | null>(null);
+
+  // Meta API Server Dispatch State
+  const [isDispatchingServer, setIsDispatchingServer] = useState(false);
+  const [serverDispatchResult, setServerDispatchResult] = useState<any | null>(null);
+  const [isDispatchModalOpen, setIsDispatchModalOpen] = useState(false);
 
   // Load lists on mount
   useEffect(() => {
@@ -94,13 +128,30 @@ function WizardContent() {
     loadLists();
   }, [initialListId]);
 
+  // Load available templates from API
+  useEffect(() => {
+    fetch("/api/whatsapp/templates")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.templates && data.templates.length > 0) {
+          setAvailableTemplates(data.templates);
+          setSelectedTemplateName(data.templates[0].name);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   // Load contacts for chosen list
   useEffect(() => {
     if (audienceType === "list" && audienceId) {
       setIsLoadingContacts(true);
       getListContacts(audienceId)
         .then((contacts) => {
-          setListContacts(contacts);
+          // Filter to only contacts with valid phone numbers
+          const valid = (contacts || []).filter(
+            (c) => c.phone && c.phone.replace(/[^0-9]/g, "").length >= 7
+          );
+          setListContacts(valid);
         })
         .catch((err) => console.error("Error loading contacts:", err))
         .finally(() => setIsLoadingContacts(false));
@@ -109,11 +160,10 @@ function WizardContent() {
     }
   }, [audienceType, audienceId]);
 
-  const selectedTpl =
-    mockWhatsAppTemplates.find((t) => t.id === templateId) ||
-    mockWhatsAppTemplates[0];
-
   const selectedList = availableLists.find((l) => l.id === audienceId);
+  const selectedTemplate =
+    availableTemplates.find((t) => t.name === selectedTemplateName) ||
+    availableTemplates[0];
 
   // Variable replacement helper
   const renderMessageForContact = (contact?: Contact) => {
@@ -123,9 +173,9 @@ function WizardContent() {
     const category =
       (contact.metadata as any)?.scraped_category ||
       (contact.metadata as any)?.category ||
-      "retail";
+      "store";
     const city =
-      (contact.metadata as any)?.search_query?.split(" ").pop() || "your city";
+      (contact.metadata as any)?.search_query?.split(" ").pop() || "Dhaka";
 
     return customMessage
       .replace(/{{businessName}}/g, businessName)
@@ -143,7 +193,7 @@ function WizardContent() {
     return `https://web.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(text)}`;
   };
 
-  // Direct Click-to-Chat URL (works on mobile app or web)
+  // Direct Click-to-Chat URL
   const getWaMeUrl = (contact: Contact) => {
     const cleanPhone = (contact.phone || "").replace(/[^0-9]/g, "");
     const text = renderMessageForContact(contact);
@@ -151,7 +201,7 @@ function WizardContent() {
   };
 
   // Runner send action
-  const handleOpenAndSendCurrent = () => {
+  const handleOpenAndSendCurrent = useCallback(() => {
     const current = listContacts[runnerIndex];
     if (!current) return;
 
@@ -166,8 +216,12 @@ function WizardContent() {
     // Advance to next
     if (runnerIndex < listContacts.length - 1) {
       setRunnerIndex((prev) => prev + 1);
+    } else {
+      // Completed all
+      setIsAutoPacing(false);
+      handleSaveWebRunnerProgress();
     }
-  };
+  }, [runnerIndex, listContacts, sentContactIds]);
 
   const handleSkipCurrent = () => {
     const current = listContacts[runnerIndex];
@@ -176,17 +230,123 @@ function WizardContent() {
     }
     if (runnerIndex < listContacts.length - 1) {
       setRunnerIndex((prev) => prev + 1);
+    } else {
+      setIsAutoPacing(false);
+      handleSaveWebRunnerProgress();
+    }
+  };
+
+  // Save web runner progress to database
+  const handleSaveWebRunnerProgress = async () => {
+    try {
+      await fetch("/api/whatsapp/campaigns/dispatch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          campaignName,
+          dispatchMode: "web_runner",
+          audienceType,
+          audienceId,
+          customMessage,
+          sentContactIds,
+          skippedContactIds,
+        }),
+      });
+    } catch (err) {
+      console.error("Failed to save campaign progress:", err);
+    }
+  };
+
+  // Auto-Pacing Timer
+  useEffect(() => {
+    if (!isAutoPacing || !isRunnerOpen) {
+      setCountdown(null);
+      return;
+    }
+
+    setCountdown(pacingIntervalSec);
+
+    const interval = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev === null || prev <= 1) {
+          handleOpenAndSendCurrent();
+          return pacingIntervalSec;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [isAutoPacing, isRunnerOpen, pacingIntervalSec, handleOpenAndSendCurrent]);
+
+  // Keyboard Shortcuts inside Runner (Space / Enter to send, S to skip)
+  useEffect(() => {
+    if (!isRunnerOpen) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+
+      if (e.key === " " || e.key === "Enter") {
+        e.preventDefault();
+        handleOpenAndSendCurrent();
+      } else if (e.key === "s" || e.key === "S") {
+        e.preventDefault();
+        handleSkipCurrent();
+      } else if (e.key === "ArrowRight") {
+        e.preventDefault();
+        setRunnerIndex((prev) => Math.min(listContacts.length - 1, prev + 1));
+      } else if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        setRunnerIndex((prev) => Math.max(0, prev - 1));
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isRunnerOpen, handleOpenAndSendCurrent, listContacts.length]);
+
+  // Launch Server-Side Meta Cloud API Blast
+  const handleDispatchMetaApi = async () => {
+    setIsDispatchingServer(true);
+    setServerDispatchResult(null);
+    setIsDispatchModalOpen(true);
+
+    try {
+      const res = await fetch("/api/whatsapp/campaigns/dispatch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          campaignName,
+          dispatchMode: "meta_api",
+          audienceType,
+          audienceId,
+          templateName: selectedTemplateName,
+          templateLanguage: selectedTemplate.language || "en_US",
+        }),
+      });
+
+      const data = await res.json();
+      setServerDispatchResult(data);
+    } catch (err: any) {
+      setServerDispatchResult({
+        success: false,
+        error: err.message || "Network error dispatching campaign",
+      });
+    } finally {
+      setIsDispatchingServer(false);
     }
   };
 
   // Export CSV of WhatsApp links
   const handleExportCsv = () => {
     if (listContacts.length === 0) return;
-    const headers = ["Business Name", "Phone", "Category", "WhatsApp Link"];
+    const headers = ["Business Name", "Phone", "Category", "Rating", "WhatsApp Web Link", "Direct WaMe Link"];
     const rows = listContacts.map((c) => [
       `"${(c.company || c.first_name || "").replace(/"/g, '""')}"`,
       `"${c.phone || ""}"`,
       `"${((c.metadata as any)?.scraped_category || "").replace(/"/g, '""')}"`,
+      `"${(c.metadata as any)?.rating || "N/A"}"`,
+      `"${getWhatsAppWebUrl(c)}"`,
       `"${getWaMeUrl(c)}"`,
     ]);
 
@@ -201,6 +361,15 @@ function WizardContent() {
   };
 
   const activeContact = listContacts[runnerIndex];
+
+  const filteredContacts = contactSearchQuery.trim()
+    ? listContacts.filter((c) =>
+        (c.company || c.first_name || "")
+          .toLowerCase()
+          .includes(contactSearchQuery.toLowerCase()) ||
+        (c.phone || "").includes(contactSearchQuery)
+      )
+    : listContacts;
 
   return (
     <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in duration-200">
@@ -225,7 +394,7 @@ function WizardContent() {
           {selectedList && (
             <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-xs font-medium text-emerald-400">
               <Users className="h-3.5 w-3.5" />
-              <span>Targeting: <strong>{selectedList.name}</strong> ({listContacts.length || selectedList.member_count} leads)</span>
+              <span>Targeting: <strong>{selectedList.name}</strong> ({listContacts.length} leads)</span>
             </div>
           )}
         </div>
@@ -307,9 +476,9 @@ function WizardContent() {
                 <button
                   type="button"
                   onClick={() => setDispatchMode("meta_api")}
-                  className={`p-4 rounded-xl border text-left transition-all ${
+                  className={`p-4 rounded-xl border text-left transition-all relative ${
                     dispatchMode === "meta_api"
-                      ? "bg-emerald-600/15 border-emerald-500/50 text-foreground shadow-sm ring-1 ring-emerald-500/30"
+                      ? "bg-primary/15 border-primary/50 text-foreground shadow-sm ring-1 ring-primary/30"
                       : "bg-card border-border text-muted-foreground hover:border-border/80"
                   }`}
                 >
@@ -318,7 +487,7 @@ function WizardContent() {
                       <ShieldCheck className="h-4 w-4 text-primary" />
                       Official Meta Cloud API (WABA)
                     </span>
-                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-secondary text-muted-foreground font-semibold">
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary/20 text-primary font-semibold">
                       Automated Server
                     </span>
                   </div>
@@ -328,25 +497,6 @@ function WizardContent() {
                 </button>
               </div>
             </div>
-
-            {dispatchMode === "meta_api" && (
-              <div className="p-3.5 rounded-xl bg-card border border-border space-y-2">
-                <label className="block text-xs font-medium text-foreground/90">
-                  Sending WhatsApp Business Account
-                </label>
-                <select
-                  value={accountId}
-                  onChange={(e) => setAccountId(e.target.value)}
-                  className="w-full bg-background border border-border rounded-lg px-3 py-2 text-xs text-foreground focus:outline-none focus:border-emerald-500"
-                >
-                  {mockWhatsAppAccounts.map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {a.display_name} ({a.phone_number}) · Official WABA
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
           </div>
 
           <div className="flex justify-end pt-4 border-t border-border">
@@ -365,49 +515,44 @@ function WizardContent() {
       {step === 2 && (
         <div className="glass-panel p-6 rounded-2xl space-y-5">
           <h2 className="text-sm font-semibold text-foreground border-b border-border pb-3">
-            Target Phone Audience
+            Target Audience Selection
           </h2>
 
           <div className="grid grid-cols-2 gap-3">
             <button
               type="button"
               onClick={() => setAudienceType("list")}
-              className={`p-4 rounded-xl border text-left transition-all ${
+              className={`p-3 rounded-xl border text-left transition-all ${
                 audienceType === "list"
-                  ? "bg-emerald-600/20 border-emerald-500/40 text-foreground"
-                  : "bg-secondary/60 border-border text-muted-foreground"
+                  ? "bg-emerald-600/20 border-emerald-500 text-foreground font-semibold"
+                  : "bg-card border-border text-muted-foreground"
               }`}
             >
-              <div className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                <Users className="h-3.5 w-3.5 text-emerald-400" />
-                <span>Static Contact List (Google Maps)</span>
-              </div>
-              <div className="text-[11px] text-muted-foreground mt-1">
-                Scraped leads list from extension
-              </div>
+              <Users className="h-4 w-4 mb-1 text-emerald-400" />
+              <div className="text-xs font-bold">Contact List</div>
+              <div className="text-[10px] text-muted-foreground">e.g. Scraped Google Maps Leads</div>
             </button>
 
             <button
               type="button"
               onClick={() => setAudienceType("segment")}
-              className={`p-4 rounded-xl border text-left transition-all ${
+              className={`p-3 rounded-xl border text-left transition-all ${
                 audienceType === "segment"
-                  ? "bg-emerald-600/20 border-emerald-500/40 text-foreground"
-                  : "bg-secondary/60 border-border text-muted-foreground"
+                  ? "bg-emerald-600/20 border-emerald-500 text-foreground font-semibold"
+                  : "bg-card border-border text-muted-foreground"
               }`}
             >
-              <div className="text-xs font-semibold text-foreground">Dynamic Segment</div>
-              <div className="text-[11px] text-muted-foreground mt-1">
-                Live audience matching phone rules
-              </div>
+              <Smartphone className="h-4 w-4 mb-1 text-emerald-400" />
+              <div className="text-xs font-bold">Dynamic Segment</div>
+              <div className="text-[10px] text-muted-foreground">Auto-filter by tags or country</div>
             </button>
           </div>
 
           {audienceType === "list" ? (
-            <div className="space-y-3">
+            <div className="space-y-4">
               <div>
                 <label className="block text-xs font-medium text-foreground/90 mb-1">
-                  Choose Lead List
+                  Choose Contact List
                 </label>
                 <select
                   value={audienceId}
@@ -416,39 +561,64 @@ function WizardContent() {
                 >
                   {availableLists.map((l) => (
                     <option key={l.id} value={l.id}>
-                      {l.name} ({l.member_count} verified contacts)
+                      {l.name} ({l.member_count || 0} contacts)
                     </option>
                   ))}
                 </select>
               </div>
 
-              {/* Sample Contacts Preview */}
-              <div className="p-3.5 rounded-xl bg-card border border-border space-y-2">
-                <div className="flex items-center justify-between text-xs font-semibold text-foreground">
-                  <span>Selected Leads Preview</span>
-                  <span className="text-[11px] font-normal text-emerald-400">
-                    {isLoadingContacts ? "Loading contacts..." : `${listContacts.length} verified phone numbers`}
+              {/* Lead Preview Table */}
+              <div className="p-4 rounded-xl bg-card border border-border space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <span className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                    <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+                    <span>
+                      {listContacts.length} Verified WhatsApp Leads in "{selectedList?.name || "List"}"
+                    </span>
                   </span>
+
+                  <input
+                    type="text"
+                    value={contactSearchQuery}
+                    onChange={(e) => setContactSearchQuery(e.target.value)}
+                    placeholder="Search inside this list..."
+                    className="bg-background border border-border rounded-lg px-2.5 py-1 text-[11px] text-foreground focus:outline-none focus:border-emerald-500"
+                  />
                 </div>
-                <div className="max-h-40 overflow-y-auto space-y-1.5 divide-y divide-border/40 pr-1">
-                  {listContacts.slice(0, 8).map((c) => (
-                    <div key={c.id} className="pt-1.5 flex items-center justify-between text-xs">
-                      <div>
-                        <div className="font-medium text-foreground truncate max-w-[220px]">
-                          {c.company || c.first_name}
-                        </div>
-                        <div className="text-[10px] text-muted-foreground">
-                          {(c.metadata as any)?.scraped_category || "Business"}
-                        </div>
-                      </div>
-                      <div className="font-mono text-[11px] text-emerald-400 font-semibold">
-                        {c.phone}
-                      </div>
+
+                <div className="max-h-56 overflow-y-auto space-y-1.5 pr-1 divide-y divide-border/40">
+                  {isLoadingContacts ? (
+                    <div className="py-6 text-center text-xs text-muted-foreground flex items-center justify-center gap-2">
+                      <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                      <span>Loading verified leads...</span>
                     </div>
-                  ))}
-                  {listContacts.length > 8 && (
-                    <div className="pt-2 text-[10px] text-muted-foreground text-center">
-                      + {listContacts.length - 8} more contacts in this list
+                  ) : filteredContacts.length > 0 ? (
+                    filteredContacts.map((c) => (
+                      <div
+                        key={c.id}
+                        className="pt-1.5 flex items-center justify-between text-xs hover:bg-secondary/30 p-1.5 rounded-lg"
+                      >
+                        <div className="min-w-0 pr-2">
+                          <div className="font-semibold text-foreground truncate">
+                            {c.company || c.first_name}
+                          </div>
+                          <div className="text-[10px] text-muted-foreground flex items-center gap-1.5">
+                            <span>{(c.metadata as any)?.scraped_category || "Business"}</span>
+                            {(c.metadata as any)?.rating && (
+                              <span className="text-amber-400">★ {(c.metadata as any).rating}</span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <span className="font-mono text-[11px] text-emerald-400 bg-emerald-950/30 px-2 py-0.5 rounded border border-emerald-500/20">
+                            {c.phone}
+                          </span>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="py-4 text-center text-xs text-muted-foreground">
+                      No contacts found matching your search.
                     </div>
                   )}
                 </div>
@@ -558,19 +728,22 @@ function WizardContent() {
             <div className="space-y-4">
               <div>
                 <label className="block text-xs font-medium text-foreground/90 mb-1">
-                  Select Meta Template
+                  Select Meta Approved Template
                 </label>
                 <select
-                  value={templateId}
-                  onChange={(e) => setTemplateId(e.target.value)}
+                  value={selectedTemplateName}
+                  onChange={(e) => setSelectedTemplateName(e.target.value)}
                   className="w-full bg-background border border-border rounded-lg px-3 py-2 text-xs text-foreground focus:outline-none focus:border-emerald-500"
                 >
-                  {mockWhatsAppTemplates.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.name} ({t.category} · {t.language})
+                  {availableTemplates.map((t) => (
+                    <option key={t.id || t.name} value={t.name}>
+                      {t.name} ({t.category} · {t.language || "en_US"})
                     </option>
                   ))}
                 </select>
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  Templates marked APPROVED can be dispatched server-side to customers.
+                </p>
               </div>
 
               {/* Dynamic Variable Mapping */}
@@ -580,7 +753,7 @@ function WizardContent() {
                 </div>
 
                 <div className="p-3 rounded-xl bg-card border border-border flex items-center justify-between">
-                  <span className="font-mono text-xs text-emerald-400">{"{{1}}"} (Customer Name)</span>
+                  <span className="font-mono text-xs text-emerald-400">{"{{1}}"} (Recipient Name)</span>
                   <select
                     value={var1}
                     onChange={(e) => setVar1(e.target.value)}
@@ -661,7 +834,7 @@ function WizardContent() {
                 <p className="text-[11px] text-muted-foreground leading-relaxed">
                   {dispatchMode === "web_runner"
                     ? "Clicking Launch will open the interactive Fast Runner modal. You can click through leads or use Spacebar to open WhatsApp Web with each message pre-filled. Zero ban risk & zero fees."
-                    : "Messages will be queued on the server and dispatched via Meta Cloud API according to your tier limits."}
+                    : "Messages will be dispatched directly through your verified Meta WhatsApp Business Cloud API number."}
                 </p>
               </div>
 
@@ -690,7 +863,7 @@ function WizardContent() {
                 <div className="whitespace-pre-line text-slate-100">
                   {dispatchMode === "web_runner"
                     ? renderMessageForContact(listContacts[0])
-                    : selectedTpl.body_text
+                    : selectedTemplate.body_text
                         .replace("{{1}}", listContacts[0]?.company || "Business Owner")
                         .replace("{{2}}", "Special Offer")}
                 </div>
@@ -721,14 +894,21 @@ function WizardContent() {
                 </button>
               ) : (
                 <button
-                  onClick={() => {
-                    alert("Official Meta Cloud API Campaign Queued!");
-                    router.push("/whatsapp/campaigns");
-                  }}
-                  className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-bold shadow-lg shadow-primary/25 transition-all"
+                  onClick={handleDispatchMetaApi}
+                  disabled={isDispatchingServer}
+                  className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-bold shadow-lg shadow-primary/25 transition-all disabled:opacity-50"
                 >
-                  <SendHorizontal className="h-4 w-4" />
-                  <span>Queue & Dispatch Server Blast</span>
+                  {isDispatchingServer ? (
+                    <>
+                      <RefreshCw className="h-4 w-4 animate-spin" />
+                      <span>Dispatching via Meta Cloud API...</span>
+                    </>
+                  ) : (
+                    <>
+                      <SendHorizontal className="h-4 w-4" />
+                      <span>Queue & Dispatch Server Blast</span>
+                    </>
+                  )}
                 </button>
               )}
             </div>
@@ -759,6 +939,20 @@ function WizardContent() {
               </div>
 
               <div className="flex items-center gap-2">
+                {/* Auto Pacing Toggle */}
+                <button
+                  type="button"
+                  onClick={() => setIsAutoPacing(!isAutoPacing)}
+                  className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold border transition-all ${
+                    isAutoPacing
+                      ? "bg-amber-500/20 text-amber-400 border-amber-500/40"
+                      : "bg-secondary text-muted-foreground border-border hover:text-foreground"
+                  }`}
+                >
+                  {isAutoPacing ? <Pause className="h-3 w-3" /> : <Play className="h-3 w-3" />}
+                  <span>{isAutoPacing ? `Auto-Sending (${countdown}s)` : "Auto-Pacing"}</span>
+                </button>
+
                 <button
                   onClick={handleExportCsv}
                   className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-secondary hover:bg-secondary/80 text-[11px] font-medium text-foreground transition-colors"
@@ -766,6 +960,7 @@ function WizardContent() {
                   <Download className="h-3 w-3 text-primary" />
                   <span>Export CSV</span>
                 </button>
+
                 <button
                   onClick={() => setIsRunnerOpen(false)}
                   className="p-1 rounded-lg text-muted-foreground hover:text-foreground transition-colors"
@@ -865,7 +1060,7 @@ function WizardContent() {
                     className="sm:col-span-2 py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-foreground text-xs font-bold flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/30 transition-all active:scale-[0.99]"
                   >
                     <SendHorizontal className="h-4 w-4" />
-                    <span>Open in WhatsApp Web &amp; Next →</span>
+                    <span>Open in WhatsApp Web &amp; Next (Spacebar) →</span>
                   </button>
 
                   <button
@@ -873,7 +1068,7 @@ function WizardContent() {
                     className="py-3 px-4 rounded-xl bg-secondary hover:bg-secondary/80 border border-border text-xs font-medium text-muted-foreground hover:text-foreground flex items-center justify-center gap-1.5 transition-colors"
                   >
                     <SkipForward className="h-3.5 w-3.5" />
-                    <span>Skip Lead</span>
+                    <span>Skip Lead (S)</span>
                   </button>
                 </div>
 
@@ -897,26 +1092,154 @@ function WizardContent() {
                     </button>
                   </div>
 
-                  <div className="font-mono text-[10px] bg-secondary/80 px-2 py-1 rounded">
-                    Status: {sentContactIds.includes(activeContact.id) ? "✓ Sent" : "Pending"}
+                  <div className="flex items-center gap-3">
+                    <span className="text-[10px] hidden sm:inline">Hotkey: [Space] to Send, [S] to Skip</span>
+                    <div className="font-mono text-[10px] bg-secondary/80 px-2 py-1 rounded">
+                      Status: {sentContactIds.includes(activeContact.id) ? "✓ Sent" : "Pending"}
+                    </div>
                   </div>
                 </div>
               </div>
             ) : (
-              <div className="text-center py-8 space-y-3">
+              <div className="text-center py-8 space-y-4">
                 <CheckCircle2 className="h-12 w-12 text-emerald-400 mx-auto" />
-                <h3 className="text-base font-bold text-foreground">
-                  All {listContacts.length} Leads Processed!
-                </h3>
-                <p className="text-xs text-muted-foreground max-w-sm mx-auto">
-                  You have completed your campaign dispatch for this list.
-                </p>
+                <div>
+                  <h3 className="text-base font-bold text-foreground">
+                    All {listContacts.length} Leads Processed!
+                  </h3>
+                  <p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto">
+                    You have dispatched messages to {sentContactIds.length} contacts and skipped {skippedContactIds.length}. The campaign has been recorded in your database.
+                  </p>
+                </div>
+
+                <div className="flex items-center justify-center gap-3 pt-2">
+                  <button
+                    onClick={() => {
+                      setIsRunnerOpen(false);
+                      router.push("/whatsapp/campaigns");
+                    }}
+                    className="px-5 py-2.5 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold shadow-md shadow-primary/25"
+                  >
+                    View All Campaigns
+                  </button>
+                  <button
+                    onClick={() => setIsRunnerOpen(false)}
+                    className="px-4 py-2.5 rounded-xl bg-secondary text-foreground text-xs font-medium"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* SERVER-SIDE META CLOUD API DISPATCH MODAL */}
+      {/* ========================================================================= */}
+      {isDispatchModalOpen && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
+          <div className="bg-card border border-border rounded-3xl w-full max-w-lg p-6 space-y-5 shadow-2xl relative">
+            <div className="flex items-center justify-between border-b border-border pb-3">
+              <div className="flex items-center gap-2">
+                <span className="w-8 h-8 rounded-xl bg-primary/20 text-primary flex items-center justify-center font-bold">
+                  <Radio className="h-4 w-4" />
+                </span>
+                <div>
+                  <h2 className="text-sm font-bold text-foreground">
+                    Meta Cloud API Server Blast
+                  </h2>
+                  <p className="text-[11px] text-muted-foreground">
+                    {campaignName} · {listContacts.length} leads
+                  </p>
+                </div>
+              </div>
+
+              {!isDispatchingServer && (
                 <button
-                  onClick={() => setIsRunnerOpen(false)}
-                  className="px-5 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-semibold"
+                  onClick={() => setIsDispatchModalOpen(false)}
+                  className="p-1 rounded-lg text-muted-foreground hover:text-foreground"
                 >
-                  Close Runner
+                  <X className="h-5 w-5" />
                 </button>
+              )}
+            </div>
+
+            {isDispatchingServer ? (
+              <div className="text-center py-8 space-y-4">
+                <RefreshCw className="h-10 w-10 text-primary animate-spin mx-auto" />
+                <div>
+                  <h3 className="text-sm font-bold text-foreground">
+                    Dispatching Outbound WhatsApp Messages...
+                  </h3>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Sending to Meta Cloud API graph servers. Please do not close this window.
+                  </p>
+                </div>
+              </div>
+            ) : serverDispatchResult?.success ? (
+              <div className="text-center py-6 space-y-4">
+                <CheckCircle2 className="h-12 w-12 text-emerald-400 mx-auto" />
+                <div>
+                  <h3 className="text-base font-bold text-foreground">
+                    Broadcast Dispatched Successfully!
+                  </h3>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {serverDispatchResult.sentCount} messages queued and dispatched through your verified Meta Business number.
+                  </p>
+                </div>
+
+                {serverDispatchResult.failedCount > 0 && (
+                  <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-400 text-left">
+                    Note: {serverDispatchResult.failedCount} messages could not be delivered (e.g. invalid phone formatting or non-WhatsApp number).
+                  </div>
+                )}
+
+                <div className="flex items-center justify-center gap-3 pt-2">
+                  <button
+                    onClick={() => {
+                      setIsDispatchModalOpen(false);
+                      router.push("/whatsapp/campaigns");
+                    }}
+                    className="px-5 py-2.5 rounded-xl bg-primary text-primary-foreground text-xs font-semibold shadow-md shadow-primary/25"
+                  >
+                    View Campaign Analytics
+                  </button>
+                  <button
+                    onClick={() => setIsDispatchModalOpen(false)}
+                    className="px-4 py-2.5 rounded-xl bg-secondary text-foreground text-xs font-medium"
+                  >
+                    Done
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-6 space-y-4">
+                <AlertCircle className="h-12 w-12 text-rose-400 mx-auto" />
+                <div>
+                  <h3 className="text-base font-bold text-foreground">
+                    Dispatch Failed
+                  </h3>
+                  <p className="text-xs text-rose-300 mt-1 max-w-sm mx-auto">
+                    {serverDispatchResult?.error || "Meta Graph API could not process the broadcast."}
+                  </p>
+                </div>
+
+                <div className="flex items-center justify-center gap-3 pt-2">
+                  <Link
+                    href="/whatsapp/config"
+                    className="px-4 py-2 rounded-xl bg-secondary hover:bg-secondary/80 text-foreground text-xs font-semibold"
+                  >
+                    Check API Configuration
+                  </Link>
+                  <button
+                    onClick={() => setIsDispatchModalOpen(false)}
+                    className="px-4 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-semibold"
+                  >
+                    Close
+                  </button>
+                </div>
               </div>
             )}
           </div>

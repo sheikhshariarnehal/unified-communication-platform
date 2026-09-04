@@ -269,18 +269,45 @@ export async function getLists(workspaceId = DEFAULT_WORKSPACE_ID): Promise<Cont
 export async function getListContacts(listId: string): Promise<Contact[]> {
   try {
     const supabase = createClient();
-    const { data, error } = await supabase
+    const { data: memberRows, error: mErr } = await supabase
       .from("list_members")
-      .select("contact:contacts(*)")
+      .select("contact_id")
       .eq("list_id", listId);
 
-    if (error || !data || data.length === 0) {
+    if (mErr || !memberRows || memberRows.length === 0) {
       return [];
     }
 
-    return data
-      .map((item: any) => item.contact)
-      .filter((c: any) => Boolean(c && c.phone));
+    const contactIds = memberRows.map((r: any) => r.contact_id);
+
+    const { data: contacts, error: cErr } = await supabase
+      .from("contacts")
+      .select("*")
+      .in("id", contactIds)
+      .not("phone", "is", null);
+
+    if (cErr || !contacts || contacts.length === 0) {
+      return [];
+    }
+
+    return contacts
+      .filter((c: any) => Boolean(c && c.phone && c.phone.trim().length > 5))
+      .map((c: any) => ({
+        id: c.id,
+        workspace_id: c.workspace_id,
+        first_name: c.first_name,
+        last_name: c.last_name,
+        email: c.email,
+        phone: c.phone,
+        company: c.company,
+        country: c.country,
+        status: c.status || "subscribed",
+        source: c.source || "Google Maps Scraper",
+        unsubscribe_token: c.unsubscribe_token || c.id,
+        metadata: c.metadata || {},
+        created_at: c.created_at || new Date().toISOString(),
+        updated_at: c.updated_at || new Date().toISOString(),
+      }));
   } catch (err) {
     console.error("Error fetching contacts for list:", err);
     return [];
