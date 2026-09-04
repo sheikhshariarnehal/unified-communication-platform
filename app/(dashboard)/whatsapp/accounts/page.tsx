@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import {
   MessageSquare,
   Plus,
@@ -13,6 +14,7 @@ import {
   ExternalLink,
   PhoneCall,
   RefreshCw,
+  Settings,
 } from "lucide-react";
 import { mockWhatsAppAccounts, getWhatsAppAccounts } from "@/lib/whatsapp/service";
 import { WhatsAppAccount } from "@/types/database";
@@ -74,13 +76,23 @@ export default function WhatsAppAccountsPage() {
           </p>
         </div>
 
-        <button
-          onClick={() => setIsConnecting(true)}
-          className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-foreground text-xs font-semibold shadow-md shadow-emerald-600/25"
-        >
-          <Plus className="h-3.5 w-3.5" />
-          <span>Connect WABA Number</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <Link
+            href="/whatsapp/config"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-secondary hover:bg-secondary/80 border border-border text-foreground text-xs font-semibold transition-colors"
+          >
+            <Settings className="h-3.5 w-3.5 text-primary" />
+            <span>API Configuration</span>
+          </Link>
+
+          <button
+            onClick={() => setIsConnecting(true)}
+            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-foreground text-xs font-semibold shadow-md shadow-emerald-600/25"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            <span>Connect WABA Number</span>
+          </button>
+        </div>
       </div>
 
       {isConnecting && (
@@ -227,11 +239,11 @@ export default function WhatsAppAccountsPage() {
                 Configure your Meta App Webhook subscription for <code>messages</code> and <code>message_template_status_update</code>:
               </p>
               <div className="flex items-center justify-between p-2 rounded-lg bg-background font-mono text-[11px] text-foreground/90">
-                <span>https://platform.unified.com/api/webhooks/whatsapp</span>
+                <span>https://unified-communication-platform-xi.vercel.app/api/webhooks/whatsapp</span>
                 <button
                   onClick={() =>
                     handleCopy(
-                      "https://platform.unified.com/api/webhooks/whatsapp",
+                      "https://unified-communication-platform-xi.vercel.app/api/webhooks/whatsapp",
                       "webhook"
                     )
                   }

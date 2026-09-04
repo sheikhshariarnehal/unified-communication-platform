@@ -63,6 +63,7 @@ const navItems: NavItem[] = [
     children: [
       { title: "Campaigns", href: "/whatsapp/campaigns" },
       { title: "Templates", href: "/whatsapp/templates" },
+      { title: "Configuration", href: "/whatsapp/config" },
       { title: "Accounts", href: "/whatsapp/accounts" },
     ],
   },

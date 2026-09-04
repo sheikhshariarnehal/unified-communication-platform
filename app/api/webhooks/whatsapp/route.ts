@@ -7,9 +7,32 @@ export async function GET(request: NextRequest) {
   const token = searchParams.get("hub.verify_token");
   const challenge = searchParams.get("hub.challenge");
 
-  const VERIFY_TOKEN = process.env.META_WEBHOOK_VERIFY_TOKEN || "unified_webhook_token";
+  const DEFAULT_VERIFY_TOKEN = process.env.META_WEBHOOK_VERIFY_TOKEN || "unified_webhook_token";
 
-  if (mode === "subscribe" && token === VERIFY_TOKEN) {
+  let isVerified = mode === "subscribe" && token === DEFAULT_VERIFY_TOKEN;
+
+  // If not matching default, check if user customized webhook_verify_token in database
+  if (!isVerified && mode === "subscribe" && token) {
+    try {
+      const { createClient } = await import("@supabase/supabase-js");
+      const url = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://uxxavporesuoszmjkijb.supabase.co";
+      const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
+      const supabase = createClient(url, key);
+      const { data } = await supabase
+        .from("whatsapp_accounts")
+        .select("webhook_verify_token")
+        .eq("webhook_verify_token", token)
+        .limit(1);
+
+      if (data && data.length > 0) {
+        isVerified = true;
+      }
+    } catch (err) {
+      console.warn("[WhatsApp Webhook Verify] Database lookup error:", err);
+    }
+  }
+
+  if (isVerified) {
     return new NextResponse(challenge, { status: 200 });
   }
 
