@@ -117,6 +117,9 @@ export default function WhatsAppConfigPage() {
     setSaveStatus(null);
 
     try {
+      // If accessToken is empty or contains mask characters ('•'), send empty string so backend tests with stored token
+      const cleanToken = (!accessToken || accessToken.includes("•")) ? "" : accessToken;
+
       const res = await fetch("/api/whatsapp/config", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -124,7 +127,7 @@ export default function WhatsAppConfigPage() {
           action: "test",
           phoneNumberId,
           wabaId,
-          accessToken,
+          accessToken: cleanToken,
         }),
       });
 
@@ -156,6 +159,10 @@ export default function WhatsAppConfigPage() {
     setSaveStatus(null);
 
     try {
+      // If user left token/secret blank or it has mask characters, don't overwrite with dots
+      const cleanToken = (!accessToken || accessToken.includes("•")) ? "" : accessToken;
+      const cleanSecret = (!appSecret || appSecret.includes("•")) ? "" : appSecret;
+
       const res = await fetch("/api/whatsapp/config", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -163,8 +170,8 @@ export default function WhatsAppConfigPage() {
           action: "save",
           phoneNumberId,
           wabaId,
-          accessToken,
-          appSecret,
+          accessToken: cleanToken,
+          appSecret: cleanSecret,
           webhookVerifyToken,
           phoneNumber: phoneNumber || (testResult?.displayPhoneNumber ?? ""),
           displayName: displayName || (testResult?.verifiedName ?? ""),
@@ -364,6 +371,10 @@ export default function WhatsAppConfigPage() {
                   <div className="relative">
                     <input
                       type={showToken ? "text" : "password"}
+                      name="meta_permanent_access_token_field"
+                      autoComplete="new-password"
+                      data-lpignore="true"
+                      data-1p-ignore="true"
                       value={accessToken}
                       onChange={(e) => setAccessToken(e.target.value)}
                       placeholder={
@@ -403,6 +414,10 @@ export default function WhatsAppConfigPage() {
                   <div className="relative">
                     <input
                       type={showAppSecret ? "text" : "password"}
+                      name="meta_app_secret_field"
+                      autoComplete="new-password"
+                      data-lpignore="true"
+                      data-1p-ignore="true"
                       value={appSecret}
                       onChange={(e) => setAppSecret(e.target.value)}
                       placeholder={

@@ -103,12 +103,14 @@ export async function POST(request: NextRequest) {
 
       let tokenToUse = accessToken?.trim();
 
-      // If token not passed in request body, retrieve stored token from DB
-      if (!tokenToUse) {
+      // If token not provided, or contains mask characters ('•'), or is too short to be a valid token,
+      // safely fall back to the stored token in the database
+      if (!tokenToUse || tokenToUse.includes("•") || tokenToUse.length < 20) {
         const { data } = await supabase
           .from("whatsapp_accounts")
           .select("encrypted_access_token")
           .eq("workspace_id", DEFAULT_WORKSPACE_ID)
+          .order("created_at", { ascending: false })
           .limit(1);
         if (data && data.length > 0 && data[0].encrypted_access_token) {
           tokenToUse = data[0].encrypted_access_token;
@@ -203,8 +205,11 @@ export async function POST(request: NextRequest) {
 
       const existingAccount = existing && existing.length > 0 ? existing[0] : null;
 
-      // Retain existing token if user didn't type a new one
-      const finalToken = accessToken?.trim() || existingAccount?.encrypted_access_token;
+      // Retain existing token if user left blank or if it contains mask characters
+      let finalToken = accessToken?.trim();
+      if (!finalToken || finalToken.includes("•") || finalToken.length < 20) {
+        finalToken = existingAccount?.encrypted_access_token;
+      }
       if (!finalToken) {
         return NextResponse.json(
           { success: false, error: "Permanent Access Token is required to save configuration." },
@@ -212,7 +217,10 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      const finalAppSecret = appSecret?.trim() || existingAccount?.app_secret || null;
+      let finalAppSecret = appSecret?.trim();
+      if (!finalAppSecret || finalAppSecret.includes("•")) {
+        finalAppSecret = existingAccount?.app_secret || null;
+      }
 
       const accountPayload = {
         workspace_id: DEFAULT_WORKSPACE_ID,
