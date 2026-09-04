@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LeadMap — Side Panel</title>
+    <script type="module" crossorigin src="/assets/sidepanel-BL7CQJ2z.js"></script>
+    <link rel="modulepreload" crossorigin href="/assets/index-BOGgeRgy.js">
+    <link rel="stylesheet" crossorigin href="/assets/index-CFSyVAAv.css">
+  </head>
+  <body class="bg-slate-50 text-slate-900" style="padding-bottom: 72px;">
+    <div id="root"></div>
+    <div id="sidepanelSyncContainer" style="position:fixed; bottom:0; left:0; right:0; padding:10px 14px; background:#ffffff; border-top:1px solid #e2e8f0; z-index:99999; box-shadow:0 -4px 12px rgba(0,0,0,0.06); font-family:system-ui,sans-serif;">
+      <button id="sidepanelSyncBtn" style="width:100%; padding:9px 14px; background:#059669; color:#fff; border:none; border-radius:8px; font-size:12px; font-weight:bold; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px; box-shadow:0 2px 4px rgba(5,150,105,0.25); transition:background 0.2s;">
+        <span>🚀 Push Leads to Unified Platform</span>
+      </button>
+      <div id="sidepanelSyncMsg" style="margin-top:4px; font-size:11px; text-align:center; font-weight:600; color:#047857; display:none;"></div>
+      <div style="margin-top:5px; display:flex; align-items:center; justify-content:space-between; font-size:10px; color:#64748b; border-top:1px solid #f1f5f9; padding-top:4px;">
+        <span id="sidepanelUrlDisplay">Platform: localhost:3000</span>
+        <a href="#" id="sidepanelChangeUrl" style="color:#2563eb; text-decoration:underline;">Change</a>
+      </div>
+    </div>
+    <script>
+      const syncBtn = document.getElementById("sidepanelSyncBtn");
+      const syncMsg = document.getElementById("sidepanelSyncMsg");
+      const urlDisplay = document.getElementById("sidepanelUrlDisplay");
+      const changeUrlBtn = document.getElementById("sidepanelChangeUrl");
+
+      if (typeof chrome !== "undefined" && chrome.storage?.local) {
+        chrome.storage.local.get(["platformUrl"], (res) => {
+          if (res && res.platformUrl) {
+            urlDisplay.innerText = "Platform: " + res.platformUrl.replace(/^https?:\/\//, "");
+          }
+        });
+      }
+
+      if (changeUrlBtn) {
+        changeUrlBtn.addEventListener("click", (e) => {
+          e.preventDefault();
+          chrome.storage.local.get(["platformUrl"], (res) => {
+            const curr = res.platformUrl || "http://localhost:3000";
+            const updated = prompt("Enter Unified Platform URL:", curr);
+            if (updated && updated.trim()) {
+              const clean = updated.trim().replace(/\/+$/, "");
+              chrome.storage.local.set({ platformUrl: clean }, () => {
+                urlDisplay.innerText = "Platform: " + clean.replace(/^https?:\/\//, "");
+              });
+            }
+          });
+        });
+      }
+
+      if (syncBtn) {
+        syncBtn.addEventListener("click", () => {
+          syncBtn.innerText = "Pushing leads to platform...";
+          syncBtn.disabled = true;
+          try {
+            chrome.runtime.sendMessage({ type: "SYNC_TO_PLATFORM" }, (res) => {
+              syncMsg.style.display = "block";
+              if (res && res.success) {
+                const count = res.stats ? res.stats.uniqueProcessed : "all";
+                const wa = res.stats ? res.stats.whatsappEligible : 0;
+                syncMsg.innerText = "✅ Synced " + count + " leads (" + wa + " WhatsApp Ready)!";
+                syncBtn.innerText = "✓ Leads Pushed! Open Platform →";
+                syncBtn.disabled = false;
+                syncBtn.style.background = "#10b981";
+                syncBtn.onclick = () => {
+                  const target = res.campaignUrls?.whatsapp || "http://localhost:3000/contacts";
+                  window.open(target, "_blank");
+                };
+              } else {
+                syncMsg.innerText = "❌ " + (res && res.error ? res.error : "Failed to connect to platform API");
+                syncBtn.innerText = "🚀 Push Leads to Unified Platform";
+                syncBtn.disabled = false;
+              }
+            });
+          } catch (e) {
+            syncMsg.style.display = "block";
+            syncMsg.innerText = "Error: " + e.message;
+            syncBtn.disabled = false;
+          }
+        });
+      }
+    </script>
+  </body>
+</html>

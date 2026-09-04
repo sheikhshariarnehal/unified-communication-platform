@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LeadMap — Popup</title>
+    <script type="module" crossorigin src="/assets/popup-BTGh0nJg.js"></script>
+    <link rel="modulepreload" crossorigin href="/assets/index-BOGgeRgy.js">
+    <link rel="stylesheet" crossorigin href="/assets/index-CFSyVAAv.css">
+  </head>
+  <body class="bg-white">
+    <div id="root"></div>
+    <div style="padding:0 16px 14px; background:#fff; font-family:system-ui,sans-serif;">
+      <button id="platformSyncBtn" style="width:100%; padding:9px 12px; background:#059669; color:#fff; border:none; border-radius:8px; font-size:12px; font-weight:bold; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px; box-shadow:0 2px 4px rgba(5,150,105,0.2);">
+        <span>🚀 Push Leads to Unified Platform</span>
+      </button>
+      <div id="platformSyncMsg" style="margin-top:6px; font-size:11px; text-align:center; font-weight:600; color:#047857;"></div>
+      <div style="margin-top:8px; display:flex; align-items:center; justify-content:space-between; font-size:10px; color:#6b7280; border-top:1px solid #f3f4f6; padding-top:6px;">
+        <span id="platformUrlDisplay">Server: localhost:3000</span>
+        <a href="#" id="changeUrlBtn" style="color:#2563eb; text-decoration:underline;">Change</a>
+      </div>
+    </div>
+    <script>
+      const btn = document.getElementById("platformSyncBtn");
+      const msg = document.getElementById("platformSyncMsg");
+      const urlDisplay = document.getElementById("platformUrlDisplay");
+      const changeBtn = document.getElementById("changeUrlBtn");
+
+      if (typeof chrome !== "undefined" && chrome.storage?.local) {
+        chrome.storage.local.get(["platformUrl"], (res) => {
+          if (res && res.platformUrl) {
+            urlDisplay.innerText = "Server: " + res.platformUrl.replace(/^https?:\/\//, "");
+          }
+        });
+      }
+
+      if (changeBtn) {
+        changeBtn.addEventListener("click", (e) => {
+          e.preventDefault();
+          chrome.storage.local.get(["platformUrl"], (res) => {
+            const curr = res.platformUrl || "http://localhost:3000";
+            const updated = prompt("Enter your published Platform URL (e.g. https://your-site.vercel.app):", curr);
+            if (updated && updated.trim()) {
+              const clean = updated.trim().replace(/\/+$/, "");
+              chrome.storage.local.set({ platformUrl: clean }, () => {
+                urlDisplay.innerText = "Server: " + clean.replace(/^https?:\/\//, "");
+              });
+            }
+          });
+        });
+      }
+
+      if (btn) {
+        btn.addEventListener("click", () => {
+          btn.innerText = "Pushing to Platform...";
+          btn.disabled = true;
+          try {
+            chrome.runtime.sendMessage({ type: "SYNC_TO_PLATFORM" }, (res) => {
+              if (res && res.success) {
+                msg.innerText = "✅ Synced " + (res.stats ? res.stats.uniqueProcessed : "all") + " leads (" + (res.stats ? res.stats.whatsappEligible : 0) + " WhatsApp)!";
+                btn.innerText = "✓ Pushed Successfully!";
+              } else {
+                msg.innerText = "❌ " + (res && res.error ? res.error : "Failed to connect to platform API");
+                btn.innerText = "🚀 Push Leads to Unified Platform";
+                btn.disabled = false;
+              }
+            });
+          } catch(e) {
+            msg.innerText = "Error: " + e.message;
+            btn.disabled = false;
+          }
+        });
+      }
+    </script>
+  </body>
+</html>
