@@ -39,13 +39,17 @@ export default function WhatsAppConfigPage() {
   const [phoneNumberId, setPhoneNumberId] = useState("");
   const [wabaId, setWabaId] = useState("");
   const [accessToken, setAccessToken] = useState("");
+  const [appSecret, setAppSecret] = useState("");
   const [webhookVerifyToken, setWebhookVerifyToken] = useState("unified_webhook_token");
   const [showToken, setShowToken] = useState(false);
+  const [showAppSecret, setShowAppSecret] = useState(false);
 
   // Status & states
   const [isConnected, setIsConnected] = useState(false);
   const [hasStoredToken, setHasStoredToken] = useState(false);
   const [maskedToken, setMaskedToken] = useState("");
+  const [hasStoredAppSecret, setHasStoredAppSecret] = useState(false);
+  const [maskedAppSecret, setMaskedAppSecret] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [callbackUrl, setCallbackUrl] = useState(
@@ -88,6 +92,8 @@ export default function WhatsAppConfigPage() {
           if (data.displayName) setDisplayName(data.displayName);
           if (data.hasToken) setHasStoredToken(true);
           if (data.maskedToken) setMaskedToken(data.maskedToken);
+          if (data.hasAppSecret) setHasStoredAppSecret(true);
+          if (data.maskedAppSecret) setMaskedAppSecret(data.maskedAppSecret);
           setIsConnected(Boolean(data.connected));
         }
       } catch (err) {
@@ -158,6 +164,7 @@ export default function WhatsAppConfigPage() {
           phoneNumberId,
           wabaId,
           accessToken,
+          appSecret,
           webhookVerifyToken,
           phoneNumber: phoneNumber || (testResult?.displayPhoneNumber ?? ""),
           displayName: displayName || (testResult?.verifiedName ?? ""),
@@ -175,6 +182,11 @@ export default function WhatsAppConfigPage() {
           setMaskedToken(data.maskedToken);
           setHasStoredToken(true);
           setAccessToken(""); // clear cleartext input once stored
+        }
+        if (data.maskedAppSecret) {
+          setMaskedAppSecret(data.maskedAppSecret);
+          setHasStoredAppSecret(true);
+          setAppSecret("");
         }
       } else {
         setSaveStatus({
@@ -374,6 +386,48 @@ export default function WhatsAppConfigPage() {
                       )}
                     </button>
                   </div>
+                </div>
+
+                {/* Meta App Secret */}
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-xs font-semibold text-foreground/90">
+                      Meta App Secret (HMAC-SHA256)
+                    </label>
+                    {hasStoredAppSecret && !appSecret && (
+                      <span className="text-[10px] text-emerald-400 font-mono">
+                        Stored ({maskedAppSecret})
+                      </span>
+                    )}
+                  </div>
+                  <div className="relative">
+                    <input
+                      type={showAppSecret ? "text" : "password"}
+                      value={appSecret}
+                      onChange={(e) => setAppSecret(e.target.value)}
+                      placeholder={
+                        hasStoredAppSecret
+                          ? "Leave blank to keep stored secret, or enter new secret"
+                          : "Enter your Meta App Secret"
+                      }
+                      className="w-full bg-secondary/50 hover:bg-secondary/80 focus:bg-background border border-border rounded-xl pl-3.5 pr-10 py-2 text-xs text-foreground placeholder-muted-foreground focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all font-mono"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowAppSecret(!showAppSecret)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                      title={showAppSecret ? "Hide secret" : "Show secret"}
+                    >
+                      {showAppSecret ? (
+                        <EyeOff className="h-4 w-4" />
+                      ) : (
+                        <Eye className="h-4 w-4" />
+                      )}
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground mt-1.5">
+                    Found in Meta for Developers &gt; App settings &gt; Basic &gt; App secret. Verifies HMAC-SHA256 signature on inbound webhooks.
+                  </p>
                 </div>
 
                 {/* Webhook Verify Token */}

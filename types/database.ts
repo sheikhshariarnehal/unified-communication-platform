@@ -133,6 +133,7 @@ export interface WhatsAppAccount {
   phone_number: string;
   display_name: string | null;
   encrypted_access_token?: string;
+  app_secret?: string;
   webhook_verify_token?: string;
   status: 'connected' | 'disconnected' | 'rate_limited' | 'restricted';
   created_at: string;

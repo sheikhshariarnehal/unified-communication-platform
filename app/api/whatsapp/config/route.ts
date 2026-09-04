@@ -42,6 +42,8 @@ export async function GET() {
         displayName: active.display_name || "",
         hasToken: Boolean(active.encrypted_access_token),
         maskedToken: active.encrypted_access_token ? maskToken(active.encrypted_access_token) : "",
+        hasAppSecret: Boolean(active.app_secret),
+        maskedAppSecret: active.app_secret ? maskToken(active.app_secret) : "",
         webhookVerifyToken: active.webhook_verify_token || "unified_webhook_token",
         status: active.status || "connected",
         updatedAt: active.updated_at || active.created_at,
@@ -57,6 +59,8 @@ export async function GET() {
       displayName: "",
       hasToken: false,
       maskedToken: "",
+      hasAppSecret: false,
+      maskedAppSecret: "",
       webhookVerifyToken: "unified_webhook_token",
       status: "disconnected",
     });
@@ -78,6 +82,7 @@ export async function POST(request: NextRequest) {
       phoneNumberId,
       wabaId,
       accessToken,
+      appSecret,
       webhookVerifyToken,
       phoneNumber,
       displayName,
@@ -191,7 +196,7 @@ export async function POST(request: NextRequest) {
       // Check existing record
       const { data: existing } = await supabase
         .from("whatsapp_accounts")
-        .select("id, encrypted_access_token")
+        .select("id, encrypted_access_token, app_secret")
         .eq("workspace_id", DEFAULT_WORKSPACE_ID)
         .order("created_at", { ascending: false })
         .limit(1);
@@ -207,6 +212,8 @@ export async function POST(request: NextRequest) {
         );
       }
 
+      const finalAppSecret = appSecret?.trim() || existingAccount?.app_secret || null;
+
       const accountPayload = {
         workspace_id: DEFAULT_WORKSPACE_ID,
         phone_number_id: phoneNumberId.trim(),
@@ -214,6 +221,7 @@ export async function POST(request: NextRequest) {
         phone_number: phoneNumber?.trim() || "+1 (555) 019-2830",
         display_name: displayName?.trim() || "WhatsApp Business Official",
         encrypted_access_token: finalToken,
+        app_secret: finalAppSecret,
         webhook_verify_token: (webhookVerifyToken || "unified_webhook_token").trim(),
         status: "connected",
         updated_at: new Date().toISOString(),
@@ -246,6 +254,7 @@ export async function POST(request: NextRequest) {
         message: "WhatsApp Business API configuration saved successfully!",
         connected: true,
         maskedToken: maskToken(finalToken),
+        maskedAppSecret: finalAppSecret ? maskToken(finalAppSecret) : null,
       });
     }
 

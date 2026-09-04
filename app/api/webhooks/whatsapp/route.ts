@@ -42,7 +42,47 @@ export async function GET(request: NextRequest) {
 // Meta Webhook Delivery & Message Ingestion (POST)
 export async function POST(request: NextRequest) {
   try {
-    const payload = await request.json();
+    const rawBody = await request.text();
+    const signature = request.headers.get("x-hub-signature-256");
+
+    let appSecret = process.env.META_APP_SECRET;
+
+    // Look up app_secret from database if not in process.env
+    if (!appSecret) {
+      try {
+        const { createClient } = await import("@supabase/supabase-js");
+        const url = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://uxxavporesuoszmjkijb.supabase.co";
+        const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
+        const supabase = createClient(url, key);
+        const { data } = await supabase
+          .from("whatsapp_accounts")
+          .select("app_secret")
+          .not("app_secret", "is", null)
+          .limit(1);
+
+        if (data && data.length > 0 && data[0].app_secret) {
+          appSecret = data[0].app_secret;
+        }
+      } catch (err) {
+        console.warn("[WhatsApp Webhook POST] App secret lookup error:", err);
+      }
+    }
+
+    // Verify HMAC-SHA256 signature if appSecret is present
+    if (appSecret && signature) {
+      const crypto = await import("crypto");
+      const expectedSignature = `sha256=${crypto
+        .createHmac("sha256", appSecret)
+        .update(rawBody)
+        .digest("hex")}`;
+
+      if (signature !== expectedSignature) {
+        console.error("[WhatsApp Webhook] HMAC signature mismatch. Rejecting untrusted request.");
+        return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
+      }
+    }
+
+    const payload = JSON.parse(rawBody);
 
     // Verify entry exists
     if (payload.object === "whatsapp_business_account") {
