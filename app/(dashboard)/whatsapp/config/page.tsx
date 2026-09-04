@@ -62,10 +62,14 @@ export default function WhatsAppConfigPage() {
   // Accordion state for Setup Instructions
   const [openStep, setOpenStep] = useState<number | null>(1);
 
-  // Dynamic origin detection on client
+  // Dynamic origin detection on client (Meta requires public HTTPS, so fallback to live Vercel if on localhost)
   useEffect(() => {
     if (typeof window !== "undefined") {
-      setCallbackUrl(`${window.location.origin}/api/webhooks/whatsapp`);
+      if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
+        setCallbackUrl("https://unified-communication-platform-xi.vercel.app/api/webhooks/whatsapp");
+      } else {
+        setCallbackUrl(`${window.location.origin}/api/webhooks/whatsapp`);
+      }
     }
   }, []);
 
