@@ -186,8 +186,8 @@ export async function getContacts(workspaceId = DEFAULT_WORKSPACE_ID): Promise<C
       .eq("workspace_id", workspaceId)
       .order("created_at", { ascending: false });
 
-    if (error || !data || data.length === 0) {
-      return mockContacts;
+    if (error || !data) {
+      return [];
     }
 
     return data.map((c: any) => ({
@@ -209,7 +209,7 @@ export async function getContacts(workspaceId = DEFAULT_WORKSPACE_ID): Promise<C
     }));
   } catch (err) {
     console.error("Error fetching contacts from Supabase:", err);
-    return mockContacts;
+    return [];
   }
 }
 
@@ -222,8 +222,8 @@ export async function getTags(workspaceId = DEFAULT_WORKSPACE_ID): Promise<Tag[]
       .eq("workspace_id", workspaceId)
       .order("name", { ascending: true });
 
-    if (error || !data || data.length === 0) {
-      return mockTags;
+    if (error || !data) {
+      return [];
     }
 
     return data.map((t: any) => ({
@@ -235,7 +235,7 @@ export async function getTags(workspaceId = DEFAULT_WORKSPACE_ID): Promise<Tag[]
     }));
   } catch (err) {
     console.error("Error fetching tags from Supabase:", err);
-    return mockTags;
+    return [];
   }
 }
 
@@ -248,8 +248,8 @@ export async function getLists(workspaceId = DEFAULT_WORKSPACE_ID): Promise<Cont
       .eq("workspace_id", workspaceId)
       .order("created_at", { ascending: false });
 
-    if (error || !data || data.length === 0) {
-      return mockLists;
+    if (error || !data) {
+      return [];
     }
 
     return data.map((l: any) => ({
@@ -262,7 +262,54 @@ export async function getLists(workspaceId = DEFAULT_WORKSPACE_ID): Promise<Cont
     }));
   } catch (err) {
     console.error("Error fetching lists from Supabase:", err);
-    return mockLists;
+    return [];
+  }
+}
+
+export async function createList(
+  workspaceId: string,
+  name: string,
+  description?: string
+): Promise<ContactList | null> {
+  try {
+    const supabase = createClient();
+    const { data, error } = await supabase
+      .from("lists")
+      .insert({
+        workspace_id: workspaceId,
+        name,
+        description: description || null,
+      })
+      .select()
+      .single();
+
+    if (error || !data) {
+      console.error("Error creating list in Supabase:", error);
+      return null;
+    }
+
+    return {
+      id: data.id,
+      workspace_id: data.workspace_id,
+      name: data.name,
+      description: data.description,
+      member_count: 0,
+      created_at: data.created_at || new Date().toISOString(),
+    };
+  } catch (err) {
+    console.error("Failed to create list in Supabase:", err);
+    return null;
+  }
+}
+
+export async function deleteList(listId: string): Promise<boolean> {
+  try {
+    const supabase = createClient();
+    const { error } = await supabase.from("lists").delete().eq("id", listId);
+    return !error;
+  } catch (err) {
+    console.error("Failed to delete list from Supabase:", err);
+    return false;
   }
 }
 
@@ -323,8 +370,8 @@ export async function getSegments(workspaceId = DEFAULT_WORKSPACE_ID): Promise<S
       .eq("workspace_id", workspaceId)
       .order("created_at", { ascending: false });
 
-    if (error || !data || data.length === 0) {
-      return mockSegments;
+    if (error || !data) {
+      return [];
     }
 
     return data.map((s: any) => ({
@@ -339,7 +386,7 @@ export async function getSegments(workspaceId = DEFAULT_WORKSPACE_ID): Promise<S
     }));
   } catch (err) {
     console.error("Error fetching segments from Supabase:", err);
-    return mockSegments;
+    return [];
   }
 }
 
@@ -352,8 +399,8 @@ export async function getSuppressionList(workspaceId = DEFAULT_WORKSPACE_ID): Pr
       .eq("workspace_id", workspaceId)
       .order("created_at", { ascending: false });
 
-    if (error || !data || data.length === 0) {
-      return mockSuppression;
+    if (error || !data) {
+      return [];
     }
 
     return data.map((sp: any) => ({
@@ -366,7 +413,7 @@ export async function getSuppressionList(workspaceId = DEFAULT_WORKSPACE_ID): Pr
     }));
   } catch (err) {
     console.error("Error fetching suppression from Supabase:", err);
-    return mockSuppression;
+    return [];
   }
 }
 

@@ -127,9 +127,15 @@ export async function POST(request: NextRequest) {
 
     if (Array.isArray(rawBody)) {
       leads = rawBody;
+      if (rawBody.length > 0 && rawBody[0]?.workspace_id) {
+        workspaceId = rawBody[0].workspace_id;
+      }
     } else if (rawBody && typeof rawBody === "object") {
       leads = Array.isArray(rawBody.leads) ? rawBody.leads : [rawBody];
       customListName = rawBody.list_name || rawBody.listName;
+      if (rawBody.workspace_id || rawBody.workspaceId) {
+        workspaceId = rawBody.workspace_id || rawBody.workspaceId;
+      }
       if (Array.isArray(rawBody.tags)) {
         customTags = rawBody.tags;
       }

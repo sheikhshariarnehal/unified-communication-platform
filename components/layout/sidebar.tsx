@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
+import { useAuth } from "@/components/providers/auth-provider";
 
 interface NavItem {
   title: string;
@@ -128,6 +129,8 @@ export function Sidebar() {
     setOpenSections((prev) => ({ ...prev, [title]: !prev[title] }));
   };
 
+  const { workspace } = useAuth();
+
   return (
     <aside className="w-60 border-r border-sidebar-border bg-sidebar text-sidebar-foreground flex flex-col h-screen sticky top-0 select-none z-30 transition-all">
       {/* Brand & Workspace Header (Distilled single container) */}
@@ -142,7 +145,7 @@ export function Sidebar() {
             </div>
             <div className="text-[10px] text-muted-foreground flex items-center gap-1.5 truncate">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
-              <span className="truncate">Acme Global</span>
+              <span className="truncate">{workspace?.name || "Acme Global"}</span>
             </div>
           </div>
         </Link>

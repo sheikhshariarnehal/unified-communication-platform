@@ -39,10 +39,12 @@ import {
   mockTags,
 } from "@/lib/contacts/service";
 import { Contact, Tag, ContactStatus } from "@/types/database";
+import { useAuth } from "@/components/providers/auth-provider";
 
 export default function ContactsPage() {
-  const [contacts, setContacts] = useState<Contact[]>(mockContacts);
-  const [tags, setTags] = useState<Tag[]>(mockTags);
+  const { workspace } = useAuth();
+  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [tags, setTags] = useState<Tag[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -60,10 +62,12 @@ export default function ContactsPage() {
   const [mapsCity, setMapsCity] = useState("Dhaka");
   const [activeSnippetTab, setActiveSnippetTab] = useState<"flow" | "code" | "curl">("flow");
 
-  const refreshContacts = async () => {
-    const [cData, tData] = await Promise.all([getContacts(), getTags()]);
-    if (cData) setContacts(cData);
-    if (tData) setTags(tData);
+  const refreshContacts = async (wsId?: string) => {
+    const targetWs = wsId || workspace?.id;
+    if (!targetWs) return;
+    const [cData, tData] = await Promise.all([getContacts(targetWs), getTags(targetWs)]);
+    setContacts(cData || []);
+    setTags(tData || []);
   };
 
   const handleJsonFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -75,6 +79,12 @@ export default function ContactsPage() {
     try {
       const text = await file.text();
       const parsed = JSON.parse(text);
+      if (workspace?.id && Array.isArray(parsed)) {
+        // Embed user's workspace
+        parsed.forEach((item: any) => {
+          item.workspace_id = workspace.id;
+        });
+      }
       const res = await fetch("/api/v1/leads/ingest", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -83,7 +93,7 @@ export default function ContactsPage() {
       const data = await res.json();
       if (data.success) {
         setScraperSyncStats(data);
-        await refreshContacts();
+        await refreshContacts(workspace?.id);
       } else {
         alert(data.error || "Failed to ingest leads");
       }
@@ -95,16 +105,14 @@ export default function ContactsPage() {
   };
 
   useEffect(() => {
-    async function loadData() {
-      try {
-        await refreshContacts();
-      } catch (err) {
-        console.error("Error loading contacts from Supabase:", err);
-      } finally {
-        setIsLoading(false);
-      }
+    if (workspace?.id) {
+      setIsLoading(true);
+      refreshContacts(workspace.id)
+        .catch((err) => console.error("Error loading contacts from Supabase:", err))
+        .finally(() => setIsLoading(false));
+    } else {
+      setIsLoading(false);
     }
-    loadData();
 
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
@@ -112,7 +120,7 @@ export default function ContactsPage() {
         setIsScraperModalOpen(true);
       }
     }
-  }, []);
+  }, [workspace?.id]);
 
   // New Contact form state
   const [newContact, setNewContact] = useState({
@@ -157,6 +165,7 @@ export default function ContactsPage() {
 
     setIsSubmitting(true);
     try {
+      const targetWs = workspace?.id || "a0000000-0000-0000-0000-000000000001";
       const saved = await createContact({
         first_name: newContact.first_name,
         last_name: newContact.last_name,
@@ -165,14 +174,14 @@ export default function ContactsPage() {
         company: newContact.company || undefined,
         country: newContact.country,
         tag_ids: tags[0]?.id ? [tags[0].id] : [],
-      });
+      }, targetWs);
 
       if (saved) {
         setContacts([saved, ...contacts]);
       } else {
         const fallback: Contact = {
           id: `cnt-${Date.now()}`,
-          workspace_id: "a0000000-0000-0000-0000-000000000001",
+          workspace_id: targetWs,
           first_name: newContact.first_name,
           last_name: newContact.last_name,
           email: newContact.email || null,
