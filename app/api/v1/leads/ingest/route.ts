@@ -1,18 +1,242 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { createClient as createServerClient } from "@/lib/supabase/server";
 
-// CORS headers to permit requests directly from Chrome extensions
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization, x-api-key",
-};
+// CORS headers to permit credentialed requests directly from Chrome extensions
+function getCorsHeaders(request: NextRequest) {
+  const origin = request.headers.get("origin") || "";
+  const headers: Record<string, string> = {
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization, x-api-key, x-workspace-id",
+  };
+  if (origin) {
+    headers["Access-Control-Allow-Origin"] = origin;
+    headers["Access-Control-Allow-Credentials"] = "true";
+  } else {
+    headers["Access-Control-Allow-Origin"] = "*";
+  }
+  return headers;
+}
 
-export async function OPTIONS() {
+export async function OPTIONS(request: NextRequest) {
   return new NextResponse(null, {
     status: 204,
-    headers: corsHeaders,
+    headers: getCorsHeaders(request),
   });
+}
+
+// Workspace resolver supporting Session Auth, API Keys, and explicit Workspace IDs
+async function resolveWorkspace(
+  request: NextRequest,
+  supabase: any,
+  rawBody?: any
+): Promise<string> {
+  // 1. Check explicit header x-workspace-id
+  const headerWs = request.headers.get("x-workspace-id");
+  if (headerWs && headerWs.trim()) {
+    const candidate = headerWs.trim().replace(/^ws_/i, "");
+    const { data: ws } = await supabase
+      .from("workspaces")
+      .select("id")
+      .eq("id", candidate)
+      .maybeSingle();
+    if (ws?.id) return ws.id;
+  }
+
+  // 2. Check explicit workspace_id in payload
+  const bodyWs =
+    rawBody?.workspace_id ||
+    rawBody?.workspaceId ||
+    (Array.isArray(rawBody) && rawBody[0]?.workspace_id);
+  if (bodyWs && typeof bodyWs === "string" && bodyWs.trim()) {
+    const candidate = bodyWs.trim().replace(/^ws_/i, "");
+    const { data: ws } = await supabase
+      .from("workspaces")
+      .select("id")
+      .eq("id", candidate)
+      .maybeSingle();
+    if (ws?.id) return ws.id;
+  }
+
+  // 3. Check Authorization or x-api-key header
+  const authHeader =
+    request.headers.get("authorization") || request.headers.get("x-api-key");
+  let explicitToken: string | null = null;
+  if (authHeader) {
+    explicitToken = authHeader.replace(/^Bearer\s+/i, "").trim();
+  }
+
+  if (explicitToken) {
+    // If token is a Supabase JWT access token
+    if (explicitToken.startsWith("ey")) {
+      try {
+        const { data: { user: jwtUser } } = await supabase.auth.getUser(explicitToken);
+        if (jwtUser?.id) {
+          const { data: member } = await supabase
+            .from("workspace_members")
+            .select("workspace_id")
+            .eq("user_id", jwtUser.id)
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          if (member?.workspace_id) return member.workspace_id;
+        }
+      } catch {
+        // ignore
+      }
+    }
+
+    // If token directly contains a UUID (e.g. "ws_f7bfa8ce..." or raw UUID)
+    const uuidMatch = explicitToken.match(
+      /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i
+    );
+    if (uuidMatch) {
+      const { data: ws } = await supabase
+        .from("workspaces")
+        .select("id")
+        .eq("id", uuidMatch[0])
+        .maybeSingle();
+      if (ws?.id) return ws.id;
+    }
+
+    // Check api_keys table if token is NOT the legacy dummy key
+    if (explicitToken !== "ewc_live_9a7fe91bc2d8") {
+      const prefixCandidate = explicitToken.substring(0, 13);
+      const prefix12 = explicitToken.substring(0, 12);
+      const { data: keyRecord } = await supabase
+        .from("api_keys")
+        .select("workspace_id")
+        .or(
+          `hashed_key.eq.${explicitToken},key_prefix.eq.${prefixCandidate},key_prefix.eq.${prefix12}`
+        )
+        .maybeSingle();
+
+      if (keyRecord?.workspace_id) {
+        return keyRecord.workspace_id;
+      }
+    }
+  }
+
+  // 4. Check active logged-in user via cookies (automatic detection for browser extension)
+  try {
+    const authServer = await createServerClient();
+    const {
+      data: { user },
+    } = await authServer.auth.getUser();
+    if (user?.id) {
+      const { data: member } = await supabase
+        .from("workspace_members")
+        .select("workspace_id")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (member?.workspace_id) {
+        return member.workspace_id;
+      }
+    }
+  } catch {
+    // Ignore cookie resolution error if running headless
+  }
+
+  // 5. If explicit token matches legacy key and user has no active session
+  if (explicitToken === "ewc_live_9a7fe91bc2d8") {
+    const { data: keyRecord } = await supabase
+      .from("api_keys")
+      .select("workspace_id")
+      .eq("key_prefix", "ewc_live_9a7f")
+      .maybeSingle();
+    if (keyRecord?.workspace_id) return keyRecord.workspace_id;
+  }
+
+  return (
+    process.env.NEXT_PUBLIC_DEFAULT_WORKSPACE_ID ||
+    "a0000000-0000-0000-0000-000000000001"
+  );
+}
+
+// GET endpoint to allow Chrome extension to auto-detect active user workspace
+export async function GET(request: NextRequest) {
+  const cors = getCorsHeaders(request);
+  const supabaseUrl =
+    process.env.NEXT_PUBLIC_SUPABASE_URL || "https://uxxavporesuoszmjkijb.supabase.co";
+  const supabaseKey =
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+    "";
+  const supabase = createClient(supabaseUrl, supabaseKey);
+
+  let user: any = null;
+  let workspaceId: string | null = null;
+  let workspaceName: string = "Acme Global Corp";
+  let apiKey: string = "ewc_live_9a7fe91bc2d8";
+
+  // Check Supabase Auth session via cookies
+  try {
+    const authServer = await createServerClient();
+    const {
+      data: { user: authUser },
+    } = await authServer.auth.getUser();
+    if (authUser) {
+      user = { id: authUser.id, email: authUser.email };
+      const { data: member } = await supabase
+        .from("workspace_members")
+        .select("workspace_id, workspaces(id, name)")
+        .eq("user_id", authUser.id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (member?.workspace_id) {
+        workspaceId = member.workspace_id;
+        workspaceName = (member as any).workspaces?.name || "Workspace";
+      }
+    }
+  } catch {
+    // ignore
+  }
+
+  // Check if header passed an API Key or workspace_id
+  if (!workspaceId) {
+    const resolved = await resolveWorkspace(request, supabase);
+    workspaceId = resolved;
+    const { data: ws } = await supabase
+      .from("workspaces")
+      .select("name")
+      .eq("id", workspaceId)
+      .maybeSingle();
+    if (ws?.name) workspaceName = ws.name;
+  }
+
+  if (workspaceId) {
+    const { data: keyRecord } = await supabase
+      .from("api_keys")
+      .select("hashed_key, key_prefix")
+      .eq("workspace_id", workspaceId)
+      .limit(1)
+      .maybeSingle();
+
+    if (keyRecord?.hashed_key) {
+      apiKey = keyRecord.hashed_key;
+    } else {
+      apiKey = `ewc_live_${workspaceId.replace(/-/g, "").slice(0, 16)}`;
+    }
+  }
+
+  return NextResponse.json(
+    {
+      success: true,
+      authenticated: !!user,
+      user,
+      workspace: {
+        id: workspaceId,
+        name: workspaceName,
+        apiKey,
+      },
+    },
+    { headers: cors }
+  );
 }
 
 // Phone normalizer tailored for Bangladesh and international numbers
@@ -87,6 +311,7 @@ export function normalizePhoneNumber(rawPhone?: string | null): {
 }
 
 export async function POST(request: NextRequest) {
+  const cors = getCorsHeaders(request);
   try {
     const supabaseUrl =
       process.env.NEXT_PUBLIC_SUPABASE_URL || "https://uxxavporesuoszmjkijb.supabase.co";
@@ -97,29 +322,7 @@ export async function POST(request: NextRequest) {
 
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // 1. Resolve Workspace & Auth
-    const authHeader =
-      request.headers.get("authorization") || request.headers.get("x-api-key");
-    let workspaceId =
-      process.env.NEXT_PUBLIC_DEFAULT_WORKSPACE_ID ||
-      "a0000000-0000-0000-0000-000000000001";
-
-    if (authHeader) {
-      const token = authHeader.replace(/^Bearer\s+/i, "").trim();
-      if (token && !token.startsWith("default")) {
-        const { data: keyRecord } = await supabase
-          .from("api_keys")
-          .select("workspace_id")
-          .or(`key_prefix.eq.${token.substring(0, 12)},hashed_key.eq.${token}`)
-          .maybeSingle();
-
-        if (keyRecord?.workspace_id) {
-          workspaceId = keyRecord.workspace_id;
-        }
-      }
-    }
-
-    // 2. Parse Incoming Payload
+    // 1. Parse Incoming Payload
     const rawBody = await request.json();
     let leads: any[] = [];
     let customListName: string | undefined;
@@ -127,15 +330,9 @@ export async function POST(request: NextRequest) {
 
     if (Array.isArray(rawBody)) {
       leads = rawBody;
-      if (rawBody.length > 0 && rawBody[0]?.workspace_id) {
-        workspaceId = rawBody[0].workspace_id;
-      }
     } else if (rawBody && typeof rawBody === "object") {
       leads = Array.isArray(rawBody.leads) ? rawBody.leads : [rawBody];
       customListName = rawBody.list_name || rawBody.listName;
-      if (rawBody.workspace_id || rawBody.workspaceId) {
-        workspaceId = rawBody.workspace_id || rawBody.workspaceId;
-      }
       if (Array.isArray(rawBody.tags)) {
         customTags = rawBody.tags;
       }
@@ -144,9 +341,12 @@ export async function POST(request: NextRequest) {
     if (!leads || leads.length === 0) {
       return NextResponse.json(
         { error: "No leads provided. Please send a JSON array of scraped leads." },
-        { status: 400, headers: corsHeaders }
+        { status: 400, headers: cors }
       );
     }
+
+    // 2. Resolve Workspace strictly for this account
+    const workspaceId = await resolveWorkspace(request, supabase, rawBody);
 
     // Deduplicate incoming batch by phone to avoid collisions in same batch
     const uniqueIncomingLeads: any[] = [];
@@ -434,7 +634,7 @@ export async function POST(request: NextRequest) {
             : "/email/campaigns/new",
         },
       },
-      { status: 200, headers: corsHeaders }
+      { status: 200, headers: cors }
     );
   } catch (err: any) {
     console.error("Lead Ingestion Error:", err);
@@ -443,7 +643,7 @@ export async function POST(request: NextRequest) {
         error: "Internal Server Error during lead ingestion",
         details: err.message,
       },
-      { status: 500, headers: corsHeaders }
+      { status: 500, headers: cors }
     );
   }
 }

@@ -26,24 +26,87 @@
       const urlDisplay = document.getElementById("platformUrlDisplay");
       const changeBtn = document.getElementById("changeUrlBtn");
 
-      if (typeof chrome !== "undefined" && chrome.storage?.local) {
-        chrome.storage.local.get(["platformUrl"], (res) => {
-          if (res && res.platformUrl) {
-            urlDisplay.innerText = "Server: " + res.platformUrl.replace(/^https?:\/\//, "");
+      async function checkConnection() {
+        if (typeof chrome === "undefined" || !chrome.storage?.local) return;
+        chrome.storage.local.get(["platformUrl", "platformApiKey", "platformWorkspaceId", "platformWorkspaceName"], async (stored) => {
+          const base = (stored.platformUrl || "http://localhost:3000").replace(/\/+$/, "");
+
+          // 1. First attempt discovery from active open platform tab
+          if (chrome.tabs?.query) {
+            try {
+              const tabs = await chrome.tabs.query({ url: [`${base}/*`, "http://localhost:3000/*", "https://*.vercel.app/*"] });
+              if (tabs && tabs.length > 0 && tabs[0].id) {
+                chrome.tabs.sendMessage(tabs[0].id, { type: "GET_ACTIVE_TAB_WORKSPACE" }, (tabResp) => {
+                  if (tabResp && tabResp.success && tabResp.workspace) {
+                    const ws = tabResp.workspace;
+                    chrome.storage.local.set({
+                      platformWorkspaceId: ws.workspaceId,
+                      platformWorkspaceName: ws.workspaceName,
+                      platformApiKey: ws.apiKey,
+                      platformUrl: ws.platformUrl || base
+                    });
+                    urlDisplay.innerHTML = '<span style="color:#059669; font-weight:700;">● Connected:</span> ' + ws.workspaceName;
+                  }
+                });
+              }
+            } catch (tabErr) {}
+          }
+
+          // 2. Fetch authenticated workspace info from platform API
+          const apiKey = stored.platformApiKey || "";
+          try {
+            const headers = {};
+            if (apiKey && !apiKey.startsWith("ewc_live_9a7f")) {
+              headers["Authorization"] = "Bearer " + apiKey;
+            }
+
+            const res = await fetch(base + "/api/v1/leads/ingest", {
+              credentials: "include",
+              headers
+            });
+            const data = await res.json();
+            if (data && data.success && data.workspace) {
+              const wsName = data.workspace.name || "My Workspace";
+              const wsId = data.workspace.id;
+              const wsKey = data.workspace.apiKey || apiKey;
+              chrome.storage.local.set({
+                platformWorkspaceId: wsId,
+                platformWorkspaceName: wsName,
+                platformApiKey: wsKey
+              });
+              urlDisplay.innerHTML = '<span style="color:#059669; font-weight:700;">● Connected:</span> ' + wsName;
+              return;
+            }
+          } catch (e) {
+            // ignore
+          }
+
+          if (stored.platformWorkspaceName) {
+            urlDisplay.innerHTML = '<span style="color:#059669; font-weight:700;">●</span> ' + stored.platformWorkspaceName;
+          } else {
+            urlDisplay.innerText = "Server: " + base.replace(/^https?:\/\//, "");
           }
         });
       }
 
+      checkConnection();
+
       if (changeBtn) {
         changeBtn.addEventListener("click", (e) => {
           e.preventDefault();
-          chrome.storage.local.get(["platformUrl"], (res) => {
+          chrome.storage.local.get(["platformUrl", "platformApiKey"], (res) => {
             const curr = res.platformUrl || "http://localhost:3000";
-            const updated = prompt("Enter your published Platform URL (e.g. https://your-site.vercel.app):", curr);
+            const updated = prompt("1. Enter Platform URL:", curr);
             if (updated && updated.trim()) {
               const clean = updated.trim().replace(/\/+$/, "");
-              chrome.storage.local.set({ platformUrl: clean }, () => {
-                urlDisplay.innerText = "Server: " + clean.replace(/^https?:\/\//, "");
+              const currKey = res.platformApiKey || "";
+              const updatedKey = prompt("2. Enter Workspace API Key (or leave blank to auto-detect):", currKey);
+              const saveObj = { platformUrl: clean };
+              if (updatedKey !== null) {
+                saveObj.platformApiKey = updatedKey.trim();
+              }
+              chrome.storage.local.set(saveObj, () => {
+                checkConnection();
               });
             }
           });

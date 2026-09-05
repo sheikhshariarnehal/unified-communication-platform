@@ -10,7 +10,9 @@ export type MessageType =
   | 'MAPS_STATUS_REPORT'
   | 'LEADS_EXTRACTED'
   | 'DETAIL_ENRICHMENT'
-  | 'TOGGLE_AUTO_SCROLL';
+  | 'TOGGLE_AUTO_SCROLL'
+  | 'SYNC_TO_PLATFORM'
+  | 'UPDATE_PLATFORM_AUTH';
 
 export interface MapsStatus {
   isConnected: boolean;

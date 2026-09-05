@@ -6,6 +6,8 @@ import { CollectionState, Lead } from '../types/lead';
 import { matchDuplicate, enrichLead } from '../database/deduplicator';
 import { pushLeadsToPlatform } from '../platform/sync';
 
+declare const chrome: any;
+
 console.log('[LeadMap] Service Worker initialized');
 
 let currentMapsStatus: MapsStatus = {
@@ -17,7 +19,7 @@ let currentMapsStatus: MapsStatus = {
 
 // Enable Side Panel to open on action click
 if (typeof chrome !== 'undefined' && chrome.sidePanel) {
-  chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch((err) => {
+  chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch((err: any) => {
     console.warn('[LeadMap] Side panel behavior setup:', err);
   });
 }
@@ -52,7 +54,7 @@ async function sendToMapsTab(message: RuntimeMessage): Promise<any> {
 }
 
 // Message Router
-chrome.runtime.onMessage.addListener((message: RuntimeMessage, _sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((message: RuntimeMessage, _sender: any, sendResponse: any) => {
   (async () => {
     try {
       switch (message.type) {
@@ -228,6 +230,92 @@ chrome.runtime.onMessage.addListener((message: RuntimeMessage, _sender, sendResp
             payload: { enabled }
           });
           sendResponse({ success: true, autoScrollActive: enabled });
+          break;
+        }
+
+        case 'UPDATE_PLATFORM_AUTH': {
+          const { workspaceId, workspaceName, apiKey, platformUrl } = (message.payload as any) || {};
+          if (workspaceId) {
+            await chrome.storage.local.set({
+              platformWorkspaceId: workspaceId,
+              platformWorkspaceName: workspaceName || 'My Workspace',
+              platformApiKey: apiKey || `ewc_live_${workspaceId.replace(/-/g, '').slice(0, 16)}`,
+              platformUrl: platformUrl || 'http://localhost:3000',
+            });
+          }
+          sendResponse({ success: true });
+          break;
+        }
+
+        case 'SYNC_TO_PLATFORM': {
+          try {
+            const allLeads = await getAllLeads();
+            if (!allLeads || allLeads.length === 0) {
+              sendResponse({ success: false, error: 'No leads collected yet. Please collect leads on Google Maps first.' });
+              break;
+            }
+
+            let storedConfig = await chrome.storage.local.get(['platformUrl', 'platformApiKey', 'platformWorkspaceId', 'platformWorkspaceName']);
+            let base = (storedConfig.platformUrl || 'http://localhost:3000').replace(/\/+$/, '');
+
+            if (!storedConfig.platformWorkspaceId || !storedConfig.platformApiKey) {
+              try {
+                const tabs = await chrome.tabs.query({ url: [`${base}/*`, 'http://localhost:3000/*', 'https://*.vercel.app/*'] });
+                if (tabs && tabs.length > 0 && tabs[0].id) {
+                  const tabResp: any = await new Promise((resolve) => {
+                    chrome.tabs.sendMessage(tabs[0].id as number, { type: 'GET_ACTIVE_TAB_WORKSPACE' }, (r: any) => {
+                      if (chrome.runtime.lastError) resolve(null);
+                      else resolve(r);
+                    });
+                  });
+                  if (tabResp && tabResp.success && tabResp.workspace) {
+                    await chrome.storage.local.set({
+                      platformWorkspaceId: tabResp.workspace.workspaceId,
+                      platformWorkspaceName: tabResp.workspace.workspaceName,
+                      platformApiKey: tabResp.workspace.apiKey,
+                      platformUrl: tabResp.workspace.platformUrl || base,
+                    });
+                    storedConfig = await chrome.storage.local.get(['platformUrl', 'platformApiKey', 'platformWorkspaceId', 'platformWorkspaceName']);
+                    base = (storedConfig.platformUrl || base).replace(/\/+$/, '');
+                  }
+                }
+              } catch (e) {
+                // non-blocking
+              }
+            }
+
+            const session = await getSessionState();
+            const queryName = session?.activeCollectionName || (allLeads.length > 0 && allLeads[allLeads.length - 1]?.searchQuery) || 'Google Maps Leads';
+
+            const payload: any = {
+              leads: allLeads,
+              list_name: queryName,
+            };
+            if (storedConfig.platformWorkspaceId) {
+              payload.workspace_id = storedConfig.platformWorkspaceId;
+            }
+
+            const headers: Record<string, string> = {
+              'Content-Type': 'application/json',
+            };
+            if (storedConfig.platformApiKey) {
+              headers['Authorization'] = `Bearer ${storedConfig.platformApiKey}`;
+            }
+            if (storedConfig.platformWorkspaceId) {
+              headers['x-workspace-id'] = storedConfig.platformWorkspaceId;
+            }
+
+            const res = await fetch(`${base}/api/v1/leads/ingest`, {
+              method: 'POST',
+              credentials: 'include',
+              headers,
+              body: JSON.stringify(payload),
+            });
+            const data = await res.json();
+            sendResponse(data);
+          } catch (err: any) {
+            sendResponse({ success: false, error: err.message });
+          }
           break;
         }
 

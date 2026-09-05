@@ -14,8 +14,7 @@ const PUBLIC_ROUTES = [
 ];
 
 const PUBLIC_API_PREFIXES = [
-  "/api/webhooks",
-  "/api/leads/ingest",
+  "/api/",
 ];
 
 export async function updateSession(request: NextRequest) {

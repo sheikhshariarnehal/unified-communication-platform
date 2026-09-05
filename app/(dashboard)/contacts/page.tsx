@@ -58,7 +58,10 @@ export default function ContactsPage() {
   const [scraperSyncStats, setScraperSyncStats] = useState<any>(null);
   const [copiedEndpoint, setCopiedEndpoint] = useState(false);
   const [copiedApiKey, setCopiedApiKey] = useState(false);
+  const [copiedWsId, setCopiedWsId] = useState(false);
   const [copiedPath, setCopiedPath] = useState(false);
+  const [syncedWithExtension, setSyncedWithExtension] = useState(false);
+  const [activeApiKey, setActiveApiKey] = useState<string>("");
   const [mapsKeyword, setMapsKeyword] = useState("Mobile shop");
   const [mapsCity, setMapsCity] = useState("Dhaka");
   const [activeSnippetTab, setActiveSnippetTab] = useState<"flow" | "code" | "curl">("flow");
@@ -107,6 +110,18 @@ export default function ContactsPage() {
 
   useEffect(() => {
     if (workspace?.id) {
+      const defaultKey = `ewc_live_${workspace.id.replace(/-/g, "").slice(0, 16)}`;
+      setActiveApiKey(defaultKey);
+
+      fetch("/api/v1/leads/ingest")
+        .then((r) => r.json())
+        .then((d) => {
+          if (d?.workspace?.apiKey) {
+            setActiveApiKey(d.workspace.apiKey);
+          }
+        })
+        .catch(() => {});
+
       setIsLoading(true);
       refreshContacts(workspace.id)
         .catch((err) => console.error("Error loading contacts from Supabase:", err))
@@ -121,6 +136,23 @@ export default function ContactsPage() {
         setIsScraperModalOpen(true);
       }
     }
+  }, [workspace?.id]);
+
+  // Auto-refresh contacts when user switches focus back to platform after pushing leads
+  useEffect(() => {
+    const handleVisibilityOrFocus = () => {
+      if (document.visibilityState === "visible" && workspace?.id) {
+        refreshContacts(workspace.id).catch(() => {});
+      }
+    };
+
+    window.addEventListener("focus", handleVisibilityOrFocus);
+    document.addEventListener("visibilitychange", handleVisibilityOrFocus);
+
+    return () => {
+      window.removeEventListener("focus", handleVisibilityOrFocus);
+      document.removeEventListener("visibilitychange", handleVisibilityOrFocus);
+    };
   }, [workspace?.id]);
 
   // New Contact form state
@@ -861,6 +893,49 @@ export default function ContactsPage() {
                 <div className="space-y-2.5">
                   <div>
                     <div className="flex items-center justify-between text-[11px] font-medium text-muted-foreground mb-1">
+                      <span>Active Workspace</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(workspace?.id || "");
+                          setCopiedWsId(true);
+                          setTimeout(() => setCopiedWsId(false), 2000);
+                        }}
+                        className="text-primary hover:underline flex items-center gap-1 font-normal"
+                      >
+                        {copiedWsId ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3" />}
+                        <span>{copiedWsId ? "Copied ID" : "Copy Workspace ID"}</span>
+                      </button>
+                    </div>
+                    <div className="font-medium text-xs bg-secondary/50 border border-border rounded-lg px-3 py-1.5 text-foreground flex items-center justify-between">
+                      <span className="font-semibold text-foreground">{workspace?.name || "My Workspace"}</span>
+                      <span className="font-mono text-[10px] text-muted-foreground">{workspace?.id}</span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between text-[11px] font-medium text-muted-foreground mb-1">
+                      <span>Workspace API Key</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(activeApiKey);
+                          setCopiedApiKey(true);
+                          setTimeout(() => setCopiedApiKey(false), 2000);
+                        }}
+                        className="text-primary hover:underline flex items-center gap-1 font-normal"
+                      >
+                        {copiedApiKey ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3" />}
+                        <span>{copiedApiKey ? "Copied" : "Copy Key"}</span>
+                      </button>
+                    </div>
+                    <div className="font-mono text-xs bg-secondary/50 border border-border rounded-lg px-3 py-1.5 text-foreground truncate select-all">
+                      {activeApiKey || "Loading API Key..."}
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between text-[11px] font-medium text-muted-foreground mb-1">
                       <span>Ingestion Endpoint</span>
                       <button
                         type="button"
@@ -880,28 +955,26 @@ export default function ContactsPage() {
                       {typeof window !== "undefined" ? `${window.location.origin}/api/v1/leads/ingest` : "/api/v1/leads/ingest"}
                     </div>
                   </div>
-
-                  <div>
-                    <div className="flex items-center justify-between text-[11px] font-medium text-muted-foreground mb-1">
-                      <span>Extension API Key</span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          navigator.clipboard.writeText("ewc_live_9a7fe91bc2d8");
-                          setCopiedApiKey(true);
-                          setTimeout(() => setCopiedApiKey(false), 2000);
-                        }}
-                        className="text-primary hover:underline flex items-center gap-1 font-normal"
-                      >
-                        {copiedApiKey ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3" />}
-                        <span>{copiedApiKey ? "Copied" : "Copy"}</span>
-                      </button>
-                    </div>
-                    <div className="font-mono text-xs bg-secondary/50 border border-border rounded-lg px-3 py-1.5 text-foreground truncate select-all">
-                      ewc_live_9a7fe91bc2d8
-                    </div>
-                  </div>
                 </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    const detail = {
+                      workspaceId: workspace?.id,
+                      workspaceName: workspace?.name,
+                      apiKey: activeApiKey,
+                      platformUrl: window.location.origin,
+                    };
+                    window.dispatchEvent(new CustomEvent("EWC_SYNC_WORKSPACE_EVENT", { detail }));
+                    setSyncedWithExtension(true);
+                    setTimeout(() => setSyncedWithExtension(false), 3000);
+                  }}
+                  className="w-full py-2 px-3 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 text-xs font-semibold flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                >
+                  {syncedWithExtension ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Sparkles className="h-3.5 w-3.5 text-emerald-500" />}
+                  <span>{syncedWithExtension ? "Extension Synced with this Workspace!" : "Sync Extension with this Workspace"}</span>
+                </button>
 
                 {typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") && (
                   <div className="pt-2 border-t border-border">
@@ -927,6 +1000,14 @@ export default function ContactsPage() {
                 )}
               </div>
             )}
+
+            <div
+              id="ewc-active-workspace-bridge"
+              data-workspace-id={workspace?.id || ""}
+              data-workspace-name={workspace?.name || ""}
+              data-api-key={activeApiKey || ""}
+              style={{ display: "none" }}
+            />
 
             {/* Stats Result Banner */}
             {scraperSyncStats && (

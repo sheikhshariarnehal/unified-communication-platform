@@ -26,24 +26,87 @@
       const urlDisplay = document.getElementById("sidepanelUrlDisplay");
       const changeUrlBtn = document.getElementById("sidepanelChangeUrl");
 
-      if (typeof chrome !== "undefined" && chrome.storage?.local) {
-        chrome.storage.local.get(["platformUrl"], (res) => {
-          if (res && res.platformUrl) {
-            urlDisplay.innerText = "Platform: " + res.platformUrl.replace(/^https?:\/\//, "");
+      async function checkConnection() {
+        if (typeof chrome === "undefined" || !chrome.storage?.local) return;
+        chrome.storage.local.get(["platformUrl", "platformApiKey", "platformWorkspaceId", "platformWorkspaceName"], async (stored) => {
+          const base = (stored.platformUrl || "http://localhost:3000").replace(/\/+$/, "");
+
+          // 1. First attempt discovery from active open platform tab
+          if (chrome.tabs?.query) {
+            try {
+              const tabs = await chrome.tabs.query({ url: [`${base}/*`, "http://localhost:3000/*", "https://*.vercel.app/*"] });
+              if (tabs && tabs.length > 0 && tabs[0].id) {
+                chrome.tabs.sendMessage(tabs[0].id, { type: "GET_ACTIVE_TAB_WORKSPACE" }, (tabResp) => {
+                  if (tabResp && tabResp.success && tabResp.workspace) {
+                    const ws = tabResp.workspace;
+                    chrome.storage.local.set({
+                      platformWorkspaceId: ws.workspaceId,
+                      platformWorkspaceName: ws.workspaceName,
+                      platformApiKey: ws.apiKey,
+                      platformUrl: ws.platformUrl || base
+                    });
+                    urlDisplay.innerHTML = '<span style="color:#059669; font-weight:700;">● Connected:</span> ' + ws.workspaceName;
+                  }
+                });
+              }
+            } catch (tabErr) {}
+          }
+
+          // 2. Fetch authenticated workspace info from platform API
+          const apiKey = stored.platformApiKey || "";
+          try {
+            const headers = {};
+            if (apiKey && !apiKey.startsWith("ewc_live_9a7f")) {
+              headers["Authorization"] = "Bearer " + apiKey;
+            }
+
+            const res = await fetch(base + "/api/v1/leads/ingest", {
+              credentials: "include",
+              headers
+            });
+            const data = await res.json();
+            if (data && data.success && data.workspace) {
+              const wsName = data.workspace.name || "My Workspace";
+              const wsId = data.workspace.id;
+              const wsKey = data.workspace.apiKey || apiKey;
+              chrome.storage.local.set({
+                platformWorkspaceId: wsId,
+                platformWorkspaceName: wsName,
+                platformApiKey: wsKey
+              });
+              urlDisplay.innerHTML = '<span style="color:#059669; font-weight:700;">● Connected:</span> ' + wsName;
+              return;
+            }
+          } catch (e) {
+            // fallback
+          }
+
+          if (stored.platformWorkspaceName) {
+            urlDisplay.innerHTML = '<span style="color:#059669; font-weight:700;">●</span> ' + stored.platformWorkspaceName;
+          } else {
+            urlDisplay.innerText = "Platform: " + base.replace(/^https?:\/\//, "");
           }
         });
       }
 
+      checkConnection();
+
       if (changeUrlBtn) {
         changeUrlBtn.addEventListener("click", (e) => {
           e.preventDefault();
-          chrome.storage.local.get(["platformUrl"], (res) => {
-            const curr = res.platformUrl || "http://localhost:3000";
-            const updated = prompt("Enter Unified Platform URL:", curr);
-            if (updated && updated.trim()) {
-              const clean = updated.trim().replace(/\/+$/, "");
-              chrome.storage.local.set({ platformUrl: clean }, () => {
-                urlDisplay.innerText = "Platform: " + clean.replace(/^https?:\/\//, "");
+          chrome.storage.local.get(["platformUrl", "platformApiKey", "platformWorkspaceId"], (res) => {
+            const currUrl = res.platformUrl || "http://localhost:3000";
+            const updatedUrl = prompt("1. Platform URL (e.g. http://localhost:3000):", currUrl);
+            if (updatedUrl && updatedUrl.trim()) {
+              const cleanUrl = updatedUrl.trim().replace(/\/+$/, "");
+              const currKey = res.platformApiKey || "";
+              const updatedKey = prompt("2. Workspace API Key (leave blank to auto-detect from active login session):", currKey);
+              const saveObj = { platformUrl: cleanUrl };
+              if (updatedKey !== null) {
+                saveObj.platformApiKey = updatedKey.trim();
+              }
+              chrome.storage.local.set(saveObj, () => {
+                checkConnection();
               });
             }
           });
@@ -60,13 +123,17 @@
               if (res && res.success) {
                 const count = res.stats ? res.stats.uniqueProcessed : "all";
                 const wa = res.stats ? res.stats.whatsappEligible : 0;
-                syncMsg.innerText = "✅ Synced " + count + " leads (" + wa + " WhatsApp Ready)!";
+                const listName = res.list?.name || "audience list";
+                syncMsg.innerText = "✅ Pushed " + count + " leads (" + wa + " WhatsApp) to " + listName + "!";
                 syncBtn.innerText = "✓ Leads Pushed! Open Platform →";
                 syncBtn.disabled = false;
                 syncBtn.style.background = "#10b981";
                 syncBtn.onclick = () => {
-                  const target = res.campaignUrls?.whatsapp || "http://localhost:3000/contacts";
-                  window.open(target, "_blank");
+                  chrome.storage.local.get(["platformUrl"], (store) => {
+                    const base = store.platformUrl || "http://localhost:3000";
+                    const target = res.campaignUrls?.whatsapp ? (base + res.campaignUrls.whatsapp) : (base + "/contacts");
+                    window.open(target, "_blank");
+                  });
                 };
               } else {
                 syncMsg.innerText = "❌ " + (res && res.error ? res.error : "Failed to connect to platform API");

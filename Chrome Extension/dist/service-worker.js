@@ -476,19 +476,93 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
           sendResponse({ success: true });
           break;
         }
+        case "UPDATE_PLATFORM_AUTH": {
+          const { workspaceId, workspaceName, apiKey, platformUrl } = message.payload || {};
+          if (workspaceId) {
+            await chrome.storage.local.set({
+              platformWorkspaceId: workspaceId,
+              platformWorkspaceName: workspaceName || "My Workspace",
+              platformApiKey: apiKey || `ewc_live_${workspaceId.replace(/-/g, "").slice(0, 16)}`,
+              platformUrl: platformUrl || "http://localhost:3000"
+            });
+          }
+          sendResponse({ success: true });
+          break;
+        }
         case "SYNC_TO_PLATFORM": {
           try {
             const allLeads = await getAllLeads();
-            const storedConfig = await chrome.storage.local.get(["platformUrl", "platformApiKey"]);
-            const base = (storedConfig.platformUrl || "http://localhost:3000").replace(/\/+$/, "");
-            const apiKey = storedConfig.platformApiKey || "ewc_live_9a7fe91bc2d8";
+            if (!allLeads || allLeads.length === 0) {
+              sendResponse({ success: false, error: "No leads collected yet. Please collect leads on Google Maps first." });
+              break;
+            }
+
+            let storedConfig = await chrome.storage.local.get([
+              "platformUrl",
+              "platformApiKey",
+              "platformWorkspaceId",
+              "platformWorkspaceName"
+            ]);
+            let base = (storedConfig.platformUrl || "http://localhost:3000").replace(/\/+$/, "");
+
+            // If workspace is not yet resolved in storage, attempt discovery from active platform tab
+            if (!storedConfig.platformWorkspaceId || !storedConfig.platformApiKey) {
+              try {
+                const tabs = await chrome.tabs.query({ url: [`${base}/*`, "http://localhost:3000/*", "https://*.vercel.app/*"] });
+                if (tabs && tabs.length > 0 && tabs[0].id) {
+                  const tabResp = await new Promise((resolve) => {
+                    chrome.tabs.sendMessage(tabs[0].id, { type: "GET_ACTIVE_TAB_WORKSPACE" }, (r) => {
+                      if (chrome.runtime.lastError) resolve(null);
+                      else resolve(r);
+                    });
+                  });
+                  if (tabResp && tabResp.success && tabResp.workspace) {
+                    await chrome.storage.local.set({
+                      platformWorkspaceId: tabResp.workspace.workspaceId,
+                      platformWorkspaceName: tabResp.workspace.workspaceName,
+                      platformApiKey: tabResp.workspace.apiKey,
+                      platformUrl: tabResp.workspace.platformUrl || base
+                    });
+                    storedConfig = await chrome.storage.local.get([
+                      "platformUrl",
+                      "platformApiKey",
+                      "platformWorkspaceId",
+                      "platformWorkspaceName"
+                    ]);
+                    base = (storedConfig.platformUrl || base).replace(/\/+$/, "");
+                  }
+                }
+              } catch (e) {
+                // non-blocking
+              }
+            }
+
+            const session = await getSessionState();
+            const queryName = session?.activeCollectionName || (allLeads.length > 0 && allLeads[allLeads.length - 1]?.searchQuery) || "Google Maps Leads";
+
+            const payload = {
+              leads: allLeads,
+              list_name: queryName
+            };
+            if (storedConfig.platformWorkspaceId) {
+              payload.workspace_id = storedConfig.platformWorkspaceId;
+            }
+
+            const headers = {
+              "Content-Type": "application/json"
+            };
+            if (storedConfig.platformApiKey) {
+              headers["Authorization"] = `Bearer ${storedConfig.platformApiKey}`;
+            }
+            if (storedConfig.platformWorkspaceId) {
+              headers["x-workspace-id"] = storedConfig.platformWorkspaceId;
+            }
+
             const res = await fetch(`${base}/api/v1/leads/ingest`, {
               method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                "Authorization": `Bearer ${apiKey}`
-              },
-              body: JSON.stringify(allLeads)
+              credentials: "include",
+              headers,
+              body: JSON.stringify(payload)
             });
             const data = await res.json();
             sendResponse(data);
