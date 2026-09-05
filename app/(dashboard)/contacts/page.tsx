@@ -29,6 +29,7 @@ import {
   Star,
   Zap,
   Globe,
+  X,
 } from "lucide-react";
 import {
   getContacts,
@@ -688,307 +689,159 @@ export default function ContactsPage() {
             </form>
           </div>
         </div>
-      )}
-
-      {/* Chrome Extension & Google Maps Scraper Integration Modal */}
+      )}      {/* Chrome Extension & Google Maps Scraper Integration Modal */}
       {isScraperModalOpen && (
-        <div className="fixed inset-0 bg-black/75 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
-          <div className="bg-card border border-border rounded-2xl w-full max-w-2xl p-6 space-y-5 shadow-2xl max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in duration-150">
+          <div className="bg-card border border-border rounded-2xl w-full max-w-lg p-6 space-y-5 shadow-2xl">
             {/* Modal Header */}
-            <div className="flex items-start justify-between border-b border-border pb-4">
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-500">
-                  <Sparkles className="h-5 w-5" />
-                </div>
-                <div>
-                  <h2 className="text-base font-bold text-foreground flex items-center gap-2">
-                    Connect Google Maps Chrome Extension
-                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 font-semibold">
-                      Automated Ingestion API
-                    </span>
-                  </h2>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    Stream scraped leads directly into your contacts with automatic BD phone normalization (+880), deduplication & WhatsApp tagging.
-                  </p>
-                </div>
+            <div className="flex items-start justify-between">
+              <div>
+                <h2 className="text-base font-semibold text-foreground tracking-tight">
+                  Google Maps Lead Ingestion
+                </h2>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Stream business contacts from Maps directly into this workspace.
+                </p>
               </div>
               <button
+                type="button"
                 onClick={() => setIsScraperModalOpen(false)}
-                className="text-muted-foreground hover:text-foreground text-sm font-medium p-1 rounded-lg hover:bg-secondary"
+                className="text-muted-foreground hover:text-foreground p-1 rounded-lg hover:bg-secondary transition-colors"
+                aria-label="Close"
               >
-                ✕
+                <X className="h-4 w-4" />
               </button>
-            </div>
-
-            {/* Quick Webhook Endpoint & Key Bar */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="p-3 rounded-xl bg-secondary/50 border border-border space-y-1">
-                <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
-                  <span>Ingestion API URL</span>
-                  <button
-                    onClick={() => {
-                      const url = `${window.location.origin}/api/v1/leads/ingest`;
-                      navigator.clipboard.writeText(url);
-                      setCopiedEndpoint(true);
-                      setTimeout(() => setCopiedEndpoint(false), 2000);
-                    }}
-                    className="text-primary hover:underline flex items-center gap-1 normal-case text-[11px]"
-                  >
-                    {copiedEndpoint ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3" />}
-                    {copiedEndpoint ? "Copied!" : "Copy"}
-                  </button>
-                </div>
-                <div className="font-mono text-xs text-foreground truncate select-all">
-                  {typeof window !== "undefined" ? `${window.location.origin}/api/v1/leads/ingest` : "/api/v1/leads/ingest"}
-                </div>
-              </div>
-
-              <div className="p-3 rounded-xl bg-secondary/50 border border-border space-y-1">
-                <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
-                  <span>Extension API Key</span>
-                  <button
-                    onClick={() => {
-                      navigator.clipboard.writeText("ewc_live_9a7fe91bc2d8");
-                      setCopiedApiKey(true);
-                      setTimeout(() => setCopiedApiKey(false), 2000);
-                    }}
-                    className="text-primary hover:underline flex items-center gap-1 normal-case text-[11px]"
-                  >
-                    {copiedApiKey ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3" />}
-                    {copiedApiKey ? "Copied!" : "Copy"}
-                  </button>
-                </div>
-                <div className="font-mono text-xs text-foreground truncate select-all">
-                  ewc_live_9a7fe91bc2d8
-                </div>
-              </div>
             </div>
 
             {/* Tab Navigation */}
-            <div className="flex border-b border-border gap-2">
+            <div className="flex border-b border-border gap-5">
               <button
+                type="button"
                 onClick={() => setActiveSnippetTab("flow")}
-                className={`pb-2 px-2 text-xs font-semibold border-b-2 transition-all ${
+                className={`pb-2 text-xs font-medium border-b-2 transition-colors ${
                   activeSnippetTab === "flow"
-                    ? "border-primary text-primary"
+                    ? "border-primary text-foreground"
                     : "border-transparent text-muted-foreground hover:text-foreground"
                 }`}
               >
-                1. Find Leads on Google Maps
+                Search &amp; Scrape
               </button>
               <button
-                onClick={() => setActiveSnippetTab("code")}
-                className={`pb-2 px-2 text-xs font-semibold border-b-2 transition-all ${
-                  activeSnippetTab === "code"
-                    ? "border-primary text-primary"
-                    : "border-transparent text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                2. Extension Setup & Code
-              </button>
-              <button
+                type="button"
                 onClick={() => setActiveSnippetTab("curl")}
-                className={`pb-2 px-2 text-xs font-semibold border-b-2 transition-all ${
+                className={`pb-2 text-xs font-medium border-b-2 transition-colors ${
                   activeSnippetTab === "curl"
-                    ? "border-primary text-primary"
+                    ? "border-primary text-foreground"
                     : "border-transparent text-muted-foreground hover:text-foreground"
                 }`}
               >
-                3. Direct JSON File Drop
+                Import JSON
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveSnippetTab("code")}
+                className={`pb-2 text-xs font-medium border-b-2 transition-colors ${
+                  activeSnippetTab === "code"
+                    ? "border-primary text-foreground"
+                    : "border-transparent text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                API &amp; Setup
               </button>
             </div>
 
             {/* Tab 1: Guided Lead Generation Flow */}
             {activeSnippetTab === "flow" && (
               <div className="space-y-4">
-                {/* Step 1: Install Extension Card */}
-                <div className="p-4 rounded-xl bg-secondary/40 border border-border space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-bold text-foreground flex items-center gap-1.5 uppercase tracking-wider">
-                      <span className="w-5 h-5 rounded-full bg-primary/20 text-primary flex items-center justify-center font-bold text-[10px]">1</span>
-                      Install Chrome Extension
-                    </span>
-                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 font-medium">
-                      v1.0.0 Production Ready
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                    {/* Option A: Direct ZIP Download */}
+                <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                  <span>Need the extension?</span>
+                  <div className="flex items-center gap-2.5">
                     <a
                       href="/downloads/leadmap-extension.zip"
                       download="leadmap-extension.zip"
-                      className="p-3 rounded-xl bg-card hover:bg-card/80 border border-primary/30 hover:border-primary flex items-start gap-2.5 transition-all group shadow-xs"
+                      className="inline-flex items-center gap-1 font-medium text-primary hover:underline"
                     >
-                      <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-                        <Download className="h-4 w-4" />
-                      </div>
-                      <div>
-                        <div className="text-xs font-bold text-foreground flex items-center gap-1.5">
-                          <span>Download Extension (.zip)</span>
-                          <span className="text-[10px] px-1 rounded bg-secondary text-muted-foreground font-mono">180KB</span>
-                        </div>
-                        <p className="text-[11px] text-muted-foreground mt-0.5">
-                          Download package directly from your server &amp; load into Chrome.
-                        </p>
-                      </div>
+                      <Download className="h-3 w-3" />
+                      <span>Download .zip</span>
                     </a>
-
-                    {/* Option B: Chrome Web Store */}
+                    <span className="text-border">·</span>
                     <a
                       href="https://chromewebstore.google.com"
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="p-3 rounded-xl bg-card hover:bg-card/80 border border-border hover:border-border/80 flex items-start gap-2.5 transition-all group shadow-xs"
+                      className="inline-flex items-center gap-1 hover:text-foreground transition-colors"
                     >
-                      <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-500 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-                        <Globe className="h-4 w-4" />
-                      </div>
-                      <div>
-                        <div className="text-xs font-bold text-foreground flex items-center gap-1.5">
-                          <span>Chrome Web Store</span>
-                          <ExternalLink className="h-3 w-3 text-muted-foreground" />
-                        </div>
-                        <p className="text-[11px] text-muted-foreground mt-0.5">
-                          1-click install once published to the Chrome Store.
-                        </p>
-                      </div>
+                      <Globe className="h-3 w-3" />
+                      <span>Web Store</span>
+                      <ExternalLink className="h-2.5 w-2.5" />
                     </a>
                   </div>
-
-                  {/* 3-Step Setup Guide */}
-                  <div className="p-2.5 rounded-lg bg-card/60 border border-border text-xs text-muted-foreground space-y-1">
-                    <div className="font-semibold text-foreground text-[11px]">Quick 3-Step Setup (for ZIP Download):</div>
-                    <ol className="list-decimal list-inside text-[11px] space-y-0.5 pl-0.5">
-                      <li>Download and extract <code className="text-foreground font-mono bg-secondary px-1 rounded">leadmap-extension.zip</code> on your computer.</li>
-                      <li>Go to <code className="text-foreground font-mono bg-secondary px-1 rounded">chrome://extensions</code> in Chrome and enable <strong>Developer mode</strong> (top-right).</li>
-                      <li>Click <strong>Load unpacked</strong> and select the extracted folder.</li>
-                    </ol>
-                  </div>
-
-                  {/* Local Developer path (only shown if on localhost) */}
-                  {typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") && (
-                    <div className="flex items-center justify-between bg-card/40 p-2 rounded-lg border border-border text-[11px] font-mono text-muted-foreground">
-                      <span className="truncate">Local Dev: D:\Poject\...\Chrome Extension\dist</span>
-                      <button
-                        onClick={() => {
-                          navigator.clipboard.writeText("D:\\Poject\\Unified Email & WhatsApp Communication Platform\\Chrome Extension\\dist");
-                          setCopiedPath(true);
-                          setTimeout(() => setCopiedPath(false), 2000);
-                        }}
-                        className="ml-2 text-primary hover:underline text-xs flex items-center gap-1 shrink-0 font-sans"
-                      >
-                        {copiedPath ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3" />}
-                        {copiedPath ? "Copied!" : "Copy Local Path"}
-                      </button>
-                    </div>
-                  )}
                 </div>
 
-                {/* Step 2: Search Parameters & Launch */}
-                <div className="p-3.5 rounded-xl bg-secondary/40 border border-border space-y-3">
-                  <span className="text-[11px] font-bold text-foreground flex items-center gap-1.5 uppercase tracking-wider">
-                    <span className="w-5 h-5 rounded-full bg-primary/20 text-primary flex items-center justify-center font-bold text-[10px]">2</span>
-                    Target Audience Search
-                  </span>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-[11px] font-medium text-muted-foreground mb-1">
-                        Business Keyword / Category
-                      </label>
-                      <input
-                        type="text"
-                        value={mapsKeyword}
-                        onChange={(e) => setMapsKeyword(e.target.value)}
-                        placeholder="e.g. Mobile shop, Restaurant, Clinic"
-                        className="w-full bg-card border border-border rounded-lg px-3 py-1.5 text-xs text-foreground focus:outline-none focus:border-primary"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[11px] font-medium text-muted-foreground mb-1">
-                        City / Location
-                      </label>
-                      <input
-                        type="text"
-                        value={mapsCity}
-                        onChange={(e) => setMapsCity(e.target.value)}
-                        placeholder="e.g. Dhaka, Gulshan, Banani"
-                        className="w-full bg-card border border-border rounded-lg px-3 py-1.5 text-xs text-foreground focus:outline-none focus:border-primary"
-                      />
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={() => {
-                      const q = `${mapsKeyword} ${mapsCity}`.trim();
-                      const url = `https://www.google.com/maps/search/${encodeURIComponent(q)}`;
-                      window.open(url, "_blank");
-                    }}
-                    className="w-full py-2.5 px-4 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-bold flex items-center justify-center gap-2 shadow-md shadow-primary/20 transition-all active:scale-[0.99]"
-                  >
-                    <Globe className="h-4 w-4" />
-                    <span>Open Google Maps &amp; Start Scraping &quot;{mapsKeyword} {mapsCity}&quot;</span>
-                    <ExternalLink className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-
-                {/* Step 3: Explanation Card */}
-                <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-800 dark:text-emerald-300 space-y-1">
-                  <div className="font-semibold flex items-center gap-1.5">
-                    <Sparkles className="h-3.5 w-3.5 text-emerald-500" />
-                    <span>Automatic Sync on Scrape Complete</span>
-                  </div>
-                  <p className="text-[11px] leading-relaxed text-muted-foreground">
-                    When Google Maps opens, open the <strong>LeadMap sidepanel</strong> and click <strong>Start Collection</strong>. When you stop collection or click <strong>&quot;Push to Platform&quot;</strong>, all leads are automatically streamed into this platform with E.164 phone formatting and grouped into a campaign list!
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {/* Tab 2: Extension Code & Snippets */}
-            {activeSnippetTab === "code" && (
-              <div className="space-y-3">
-                <p className="text-xs text-muted-foreground">
-                  The extension is already configured to point to <code className="text-foreground font-mono">http://localhost:3000/api/v1/leads/ingest</code> with key <code className="text-foreground font-mono">ewc_live_9a7fe91bc2d8</code>.
-                </p>
-                <div className="relative rounded-xl bg-slate-950 p-3.5 border border-slate-800 text-[11px] font-mono text-emerald-300 overflow-x-auto">
-                  <pre>{`// In your scraper's service-worker or popup:
-fetch("${typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000'}/api/v1/leads/ingest", {
-  method: "POST",
-  headers: {
-    "Content-Type": "application/json",
-    "Authorization": "Bearer ewc_live_9a7fe91bc2d8"
-  },
-  body: JSON.stringify(scrapedLeads)
-});`}</pre>
-                  <button
-                    onClick={() => {
-                      const code = `fetch("${window.location.origin}/api/v1/leads/ingest", {\n  method: "POST",\n  headers: {\n    "Content-Type": "application/json",\n    "Authorization": "Bearer ewc_live_9a7fe91bc2d8"\n  },\n  body: JSON.stringify(scrapedLeads)\n});`;
-                      navigator.clipboard.writeText(code);
-                      alert("Code copied to clipboard!");
-                    }}
-                    className="absolute top-2 right-2 px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-xs text-slate-200 flex items-center gap-1 border border-slate-700"
-                  >
-                    <Copy className="h-3 w-3" /> Copy Code
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* Tab 3: Direct File Upload */}
-            {activeSnippetTab === "curl" && (
-              <div className="space-y-4">
-                <p className="text-xs text-muted-foreground">
-                  Already downloaded a <code className="text-foreground font-mono font-semibold">leadmap-leads-*.json</code> file? Drop it here to import immediately without needing to modify the extension!
-                </p>
-
-                <div className="p-6 border-2 border-dashed border-border hover:border-primary/50 rounded-2xl bg-secondary/20 text-center space-y-3 transition-colors">
-                  <FileJson className="h-10 w-10 text-primary mx-auto opacity-70" />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="cursor-pointer inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold shadow-md transition-all">
-                      <Upload className="h-4 w-4" />
-                      <span>{isUploadingScraper ? "Processing Leads..." : "Select JSON Leads File"}</span>
+                    <label className="block text-[11px] font-medium text-muted-foreground mb-1">
+                      Category or Keyword
+                    </label>
+                    <input
+                      type="text"
+                      value={mapsKeyword}
+                      onChange={(e) => setMapsKeyword(e.target.value)}
+                      placeholder="e.g. Mobile shop, Clinic"
+                      className="w-full bg-background border border-border rounded-lg px-3 py-1.5 text-xs text-foreground focus:outline-none focus:border-primary"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-medium text-muted-foreground mb-1">
+                      City or Location
+                    </label>
+                    <input
+                      type="text"
+                      value={mapsCity}
+                      onChange={(e) => setMapsCity(e.target.value)}
+                      placeholder="e.g. Dhaka, Banani"
+                      className="w-full bg-background border border-border rounded-lg px-3 py-1.5 text-xs text-foreground focus:outline-none focus:border-primary"
+                    />
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    const q = `${mapsKeyword} ${mapsCity}`.trim();
+                    const url = `https://www.google.com/maps/search/${encodeURIComponent(q)}`;
+                    window.open(url, "_blank");
+                  }}
+                  className="w-full py-2.5 px-4 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold flex items-center justify-center gap-2 shadow-xs transition-colors cursor-pointer"
+                >
+                  <Globe className="h-3.5 w-3.5" />
+                  <span>Launch Google Maps &amp; Scrape</span>
+                  <ExternalLink className="h-3 w-3 opacity-70" />
+                </button>
+
+                <p className="text-[11px] text-muted-foreground text-center leading-relaxed">
+                  Collected leads stream into this workspace with BD phone normalization (+880) and WhatsApp tagging.
+                </p>
+              </div>
+            )}
+
+            {/* Tab 2: Direct File Upload */}
+            {activeSnippetTab === "curl" && (
+              <div className="space-y-3">
+                <div className="p-6 border-2 border-dashed border-border hover:border-primary/40 rounded-xl bg-secondary/15 text-center space-y-2.5 transition-colors">
+                  <FileJson className="h-8 w-8 text-primary/70 mx-auto" />
+                  <div>
+                    <p className="text-xs font-medium text-foreground">
+                      Import leads from JSON
+                    </p>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                      Select or drop your exported leadmap-leads.json file.
+                    </p>
+                  </div>
+                  <div className="pt-1">
+                    <label className="cursor-pointer inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-secondary hover:bg-secondary/80 text-foreground border border-border text-xs font-medium transition-colors">
+                      <Upload className="h-3.5 w-3.5 text-primary" />
+                      <span>{isUploadingScraper ? "Processing Leads..." : "Choose File"}</span>
                       <input
                         type="file"
                         accept=".json,application/json"
@@ -998,35 +851,105 @@ fetch("${typeof window !== 'undefined' ? window.location.origin : 'http://localh
                       />
                     </label>
                   </div>
-                  <p className="text-[11px] text-muted-foreground">
-                    Accepts Google Maps JSON formats matching businessName, phone, rating, category, etc.
-                  </p>
                 </div>
+              </div>
+            )}
+
+            {/* Tab 3: API & Setup */}
+            {activeSnippetTab === "code" && (
+              <div className="space-y-3.5 text-xs">
+                <div className="space-y-2.5">
+                  <div>
+                    <div className="flex items-center justify-between text-[11px] font-medium text-muted-foreground mb-1">
+                      <span>Ingestion Endpoint</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const url = `${window.location.origin}/api/v1/leads/ingest`;
+                          navigator.clipboard.writeText(url);
+                          setCopiedEndpoint(true);
+                          setTimeout(() => setCopiedEndpoint(false), 2000);
+                        }}
+                        className="text-primary hover:underline flex items-center gap-1 font-normal"
+                      >
+                        {copiedEndpoint ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3" />}
+                        <span>{copiedEndpoint ? "Copied" : "Copy"}</span>
+                      </button>
+                    </div>
+                    <div className="font-mono text-xs bg-secondary/50 border border-border rounded-lg px-3 py-1.5 text-foreground truncate select-all">
+                      {typeof window !== "undefined" ? `${window.location.origin}/api/v1/leads/ingest` : "/api/v1/leads/ingest"}
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between text-[11px] font-medium text-muted-foreground mb-1">
+                      <span>Extension API Key</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText("ewc_live_9a7fe91bc2d8");
+                          setCopiedApiKey(true);
+                          setTimeout(() => setCopiedApiKey(false), 2000);
+                        }}
+                        className="text-primary hover:underline flex items-center gap-1 font-normal"
+                      >
+                        {copiedApiKey ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3" />}
+                        <span>{copiedApiKey ? "Copied" : "Copy"}</span>
+                      </button>
+                    </div>
+                    <div className="font-mono text-xs bg-secondary/50 border border-border rounded-lg px-3 py-1.5 text-foreground truncate select-all">
+                      ewc_live_9a7fe91bc2d8
+                    </div>
+                  </div>
+                </div>
+
+                {typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") && (
+                  <div className="pt-2 border-t border-border">
+                    <div className="flex items-center justify-between text-[11px] text-muted-foreground mb-1">
+                      <span>Local Extension Path</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText("D:\\Poject\\Unified Email & WhatsApp Communication Platform\\Chrome Extension\\dist");
+                          setCopiedPath(true);
+                          setTimeout(() => setCopiedPath(false), 2000);
+                        }}
+                        className="text-primary hover:underline flex items-center gap-1"
+                      >
+                        {copiedPath ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3" />}
+                        <span>{copiedPath ? "Copied" : "Copy path"}</span>
+                      </button>
+                    </div>
+                    <div className="font-mono text-[11px] text-muted-foreground bg-secondary/30 px-2.5 py-1 rounded border border-border truncate">
+                      Chrome Extension\dist
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
             {/* Stats Result Banner */}
             {scraperSyncStats && (
-              <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 space-y-2 animate-in fade-in">
-                <div className="flex items-center gap-2 font-semibold text-xs text-emerald-300">
-                  <CheckCircle2 className="h-4 w-4" />
+              <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-xs space-y-2">
+                <div className="flex items-center gap-2 font-medium text-emerald-600 dark:text-emerald-400">
+                  <CheckCircle2 className="h-4 w-4 shrink-0" />
                   <span>{scraperSyncStats.message}</span>
                 </div>
-                <div className="grid grid-cols-4 gap-2 text-center pt-2 border-t border-emerald-500/20 text-xs">
+                <div className="grid grid-cols-4 gap-2 pt-2 border-t border-emerald-500/15 text-center text-[11px]">
                   <div>
-                    <div className="font-bold text-foreground">{scraperSyncStats.stats.totalReceived}</div>
+                    <div className="font-semibold text-foreground">{scraperSyncStats.stats.totalReceived}</div>
                     <div className="text-[10px] text-muted-foreground">Received</div>
                   </div>
                   <div>
-                    <div className="font-bold text-emerald-400">{scraperSyncStats.stats.whatsappEligible}</div>
-                    <div className="text-[10px] text-muted-foreground">WhatsApp Ready</div>
+                    <div className="font-semibold text-emerald-600 dark:text-emerald-400">{scraperSyncStats.stats.whatsappEligible}</div>
+                    <div className="text-[10px] text-muted-foreground">WhatsApp</div>
                   </div>
                   <div>
-                    <div className="font-bold text-foreground">{scraperSyncStats.stats.inserted}</div>
-                    <div className="text-[10px] text-muted-foreground">New Inserted</div>
+                    <div className="font-semibold text-foreground">{scraperSyncStats.stats.inserted}</div>
+                    <div className="text-[10px] text-muted-foreground">New</div>
                   </div>
                   <div>
-                    <div className="font-bold text-amber-400">{scraperSyncStats.stats.landlines}</div>
+                    <div className="font-semibold text-foreground">{scraperSyncStats.stats.landlines}</div>
                     <div className="text-[10px] text-muted-foreground">Landlines</div>
                   </div>
                 </div>
@@ -1036,19 +959,22 @@ fetch("${typeof window !== 'undefined' ? window.location.origin : 'http://localh
             {/* Modal Footer Actions */}
             <div className="flex items-center justify-between pt-3 border-t border-border">
               <div className="text-[11px] text-muted-foreground">
-                All leads are placed in list: <span className="font-medium text-foreground">Google Maps: mobile shop dhaka</span>
+                Destination: <span className="font-medium text-foreground">{mapsKeyword ? `${mapsKeyword} (${mapsCity})` : "Google Maps Leads"}</span>
               </div>
               <div className="flex items-center gap-2">
-                <Link
-                  href={scraperSyncStats?.campaignUrls?.whatsapp || "/whatsapp/campaigns/new"}
-                  className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-sm transition-colors"
-                >
-                  <MessageSquare className="h-3.5 w-3.5" />
-                  <span>Start WhatsApp Campaign</span>
-                </Link>
+                {scraperSyncStats?.campaignUrls?.whatsapp && (
+                  <Link
+                    href={scraperSyncStats.campaignUrls.whatsapp}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-xs transition-colors"
+                  >
+                    <MessageSquare className="h-3.5 w-3.5" />
+                    <span>Start Campaign</span>
+                  </Link>
+                )}
                 <button
+                  type="button"
                   onClick={() => setIsScraperModalOpen(false)}
-                  className="px-3 py-1.5 rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground"
+                  className="px-3 py-1.5 rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
                 >
                   Close
                 </button>
