@@ -1,17 +1,11 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { decrypt } from "@/lib/whatsapp/encryption";
 import { sendTextMessage, sendTemplateMessage } from "@/lib/whatsapp/meta-api";
 import { sanitizePhoneForMeta } from "@/lib/whatsapp/phone-utils";
 
 const DEFAULT_WORKSPACE_ID =
   process.env.NEXT_PUBLIC_DEFAULT_WORKSPACE_ID || "a0000000-0000-0000-0000-000000000001";
-
-function getSupabaseAdmin() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://uxxavporesuoszmjkijb.supabase.co";
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
-  return createClient(url, key);
-}
 
 export async function POST(request: NextRequest) {
   try {

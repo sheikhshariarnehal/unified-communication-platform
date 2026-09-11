@@ -2025,6 +2025,12 @@ function WizardContent() {
                     {serverDispatchResult.message ||
                       `${displaySent} sent, ${displayFailed} failed.`}
                   </p>
+                  {serverDispatchResult.error && (
+                    <div className="text-[11px] text-rose-300 font-mono bg-rose-950/40 p-2.5 rounded-xl border border-rose-500/25 max-w-md mx-auto text-left break-words">
+                      <span className="font-bold text-rose-400">Server Error: </span>
+                      {serverDispatchResult.error}
+                    </div>
+                  )}
                 </div>
 
                 {/* Stat Badges */}
