@@ -2,15 +2,50 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --background: oklch(1.0000 0 0);
+  --foreground: oklch(0.2686 0 0);
+  --card: oklch(1.0000 0 0);
+  --card-foreground: oklch(0.2686 0 0);
+  --popover: oklch(1.0000 0 0);
+  --popover-foreground: oklch(0.2686 0 0);
+  --primary: oklch(0.9345 0.0583 80.4638); /* #fee6be warm champagne gold */
+  --primary-foreground: oklch(0 0 0);
+  --secondary: oklch(0.9665 0.0045 258.3247);
+  --secondary-foreground: oklch(0.4419 0.0375 257.2811);
+  --muted: oklch(0.9846 0.0017 247.8389);
+  --muted-foreground: oklch(0.5471 0.0321 263.2921);
+  --accent: oklch(0.9869 0.0214 95.2774);
+  --accent-foreground: oklch(0.4910 0.1442 43.4774);
+  --destructive: oklch(0.6496 0.2362 26.9032);
+  --destructive-foreground: oklch(1.0000 0 0);
+  --border: oklch(0.9271 0.0075 260.7315);
+  --input: oklch(0.9271 0.0075 260.7315);
+  --ring: oklch(0.9345 0.0583 80.4638);
+  --radius: 0.5rem;
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+
+  --shadow-2xs: 0px 4px 8px -1px hsl(0 0% 10.1961% / 0.05);
+  --shadow-xs: 0px 4px 8px -1px hsl(0 0% 10.1961% / 0.05);
+  --shadow-sm: 0px 4px 8px -1px hsl(0 0% 10.1961% / 0.10), 0px 1px 2px -2px hsl(0 0% 10.1961% / 0.10);
+  --shadow-md: 0px 4px 8px -1px hsl(0 0% 10.1961% / 0.10), 0px 2px 4px -2px hsl(0 0% 10.1961% / 0.10);
+  --shadow-lg: 0px 4px 8px -1px hsl(0 0% 10.1961% / 0.10), 0px 4px 6px -2px hsl(0 0% 10.1961% / 0.10);
+
+  /* Communication Platform Brand Colors */
+  --whatsapp: #10b981;
+  --whatsapp-glow: rgba(16, 185, 129, 0.25);
+  --primary-glow: rgba(254, 230, 190, 0.35);
+}
+
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-  color: #1e293b;
-  background-color: #f8fafc;
+  font-family: var(--font-sans);
+  color: var(--foreground);
+  background-color: var(--background);
   overflow-x: hidden;
 }
 
-/* Custom slick scrollbars */
+/* Custom slick scrollbars matching platform */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -21,10 +56,53 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-  border-radius: 9999px;
+  background: var(--border);
+  border-radius: var(--radius);
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  background: var(--muted-foreground);
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideLeft {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-slide-left {
+  animation: slideLeft 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-scale-in {
+  animation: scaleIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }

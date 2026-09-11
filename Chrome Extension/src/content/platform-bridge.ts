@@ -1,8 +1,6 @@
 // Platform Bridge Content Script for LeadMap Extension
 // Runs on http://localhost:3000/*, http://127.0.0.1:3000/*, https://*.vercel.app/*
 
-declare const chrome: any;
-
 (function() {
   try {
     document.documentElement.setAttribute("data-leadmap-installed", "true");

@@ -58,7 +58,7 @@ const urlWatcher = setInterval(() => {
 }, 1000);
 
 // Listen for messages from background service worker
-chrome.runtime.onMessage.addListener((message: RuntimeMessage, _sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((message: RuntimeMessage, _sender: any, sendResponse: any) => {
   switch (message.type) {
     case 'GET_STATUS': {
       sendResponse(getMapsStatus());

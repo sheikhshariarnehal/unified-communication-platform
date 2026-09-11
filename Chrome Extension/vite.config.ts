@@ -27,7 +27,17 @@ function chromeExtensionPlugin() {
         sourcemap: false
       });
 
-      console.log('✓ Successfully bundled standalone content.js and service-worker.js');
+      // 3. Bundle platform bridge content script as standalone IIFE
+      buildSync({
+        entryPoints: [resolve(__dirname, 'src/content/platform-bridge.ts')],
+        bundle: true,
+        outfile: resolve(__dirname, 'dist/platform-bridge.js'),
+        format: 'iife',
+        target: 'chrome100',
+        sourcemap: false
+      });
+
+      console.log('✓ Successfully bundled content.js, service-worker.js, and platform-bridge.js');
     }
   };
 }

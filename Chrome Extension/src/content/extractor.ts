@@ -1,6 +1,7 @@
 import { Lead } from '../types/lead';
 import {
   cleanText,
+  cleanAddress,
   parseRating,
   parseReviewCount,
   normalizePhone,
@@ -190,7 +191,7 @@ export function extractLeadFromListingElement(
       phone,
       normalizedPhone,
       website,
-      address,
+      address: cleanAddress(address, businessName, category),
       mapsUrl,
       businessStatus,
       latitude: coords.lat,

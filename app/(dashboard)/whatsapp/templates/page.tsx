@@ -31,9 +31,27 @@ export default function WhatsAppTemplatesPage() {
   }, []);
 
 
-  const handleSync = () => {
+  const reloadTemplates = async () => {
+    const data = await getWhatsAppTemplates();
+    if (data && data.length > 0) {
+      setTemplates(data);
+      setSelectedTemplate(data[0]);
+    }
+  };
+
+  const handleSync = async () => {
     setIsSyncing(true);
-    setTimeout(() => setIsSyncing(false), 1200);
+    try {
+      const res = await fetch("/api/whatsapp/templates/sync", { method: "POST" });
+      const data = await res.json();
+      if (data.success) {
+        await reloadTemplates();
+      }
+    } catch (err) {
+      console.error("Failed to sync templates:", err);
+    } finally {
+      setIsSyncing(false);
+    }
   };
 
   return (

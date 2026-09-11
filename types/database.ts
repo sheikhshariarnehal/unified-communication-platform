@@ -204,3 +204,85 @@ export interface Campaign {
   created_at: string;
   updated_at: string;
 }
+
+export interface Conversation {
+  id: string;
+  workspace_id: string;
+  contact_id: string;
+  status: 'open' | 'pending' | 'closed';
+  assigned_agent_id?: string | null;
+  last_message_text?: string | null;
+  last_message_at: string;
+  unread_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Message {
+  id: string;
+  workspace_id: string;
+  conversation_id: string;
+  sender_type: 'customer' | 'agent' | 'bot';
+  sender_id?: string | null;
+  content_type: 'text' | 'image' | 'document' | 'audio' | 'video' | 'template' | 'interactive';
+  content_text?: string | null;
+  media_url?: string | null;
+  media_type?: string | null;
+  template_name?: string | null;
+  message_id?: string | null;
+  status: 'sending' | 'sent' | 'delivered' | 'read' | 'failed';
+  error_message?: string | null;
+  created_at: string;
+}
+
+export interface Broadcast {
+  id: string;
+  workspace_id: string;
+  name: string;
+  template_name: string;
+  template_language: string;
+  template_variables?: any;
+  audience_filter?: any;
+  scheduled_at?: string | null;
+  status: 'draft' | 'scheduled' | 'sending' | 'sent' | 'completed' | 'failed';
+  total_recipients: number;
+  sent_count: number;
+  delivered_count: number;
+  read_count: number;
+  replied_count: number;
+  failed_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface BroadcastRecipient {
+  id: string;
+  broadcast_id: string;
+  contact_id: string;
+  workspace_id: string;
+  phone: string;
+  params?: any;
+  status: 'pending' | 'sent' | 'delivered' | 'read' | 'replied' | 'failed';
+  sent_at?: string | null;
+  delivered_at?: string | null;
+  read_at?: string | null;
+  replied_at?: string | null;
+  error_message?: string | null;
+  whatsapp_message_id?: string | null;
+  created_at: string;
+}
+
+export interface WhatsAppConfig {
+  id: string;
+  workspace_id: string;
+  phone_number_id: string;
+  waba_id?: string | null;
+  access_token: string;
+  verify_token?: string | null;
+  app_secret?: string | null;
+  status: 'connected' | 'disconnected' | 'rate_limited' | 'restricted';
+  connected_at?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+

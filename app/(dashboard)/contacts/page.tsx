@@ -66,6 +66,21 @@ export default function ContactsPage() {
   const [mapsCity, setMapsCity] = useState("Dhaka");
   const [activeSnippetTab, setActiveSnippetTab] = useState<"flow" | "code" | "curl">("flow");
 
+  // Single WhatsApp Message Modal State
+  const [singleMessageContact, setSingleMessageContact] = useState<Contact | null>(null);
+  const [singleMessageText, setSingleMessageText] = useState("");
+  const [singleMessageCopied, setSingleMessageCopied] = useState(false);
+
+  const handleOpenSingleMessage = (contact: Contact) => {
+    setSingleMessageContact(contact);
+    const name = contact.company || contact.first_name || "there";
+    const category = (contact.metadata as any)?.scraped_category || "business";
+    const city = (contact.metadata as any)?.search_query?.split(" ").pop() || "Dhaka";
+    setSingleMessageText(
+      `Assalamu Alaikum ${name},\n\nI found your ${category} business on Google Maps in ${city}! Are you currently accepting new inquiries or supply orders?`
+    );
+  };
+
   const refreshContacts = async (wsId?: string) => {
     const targetWs = wsId || workspace?.id;
     if (!targetWs) return;
@@ -368,26 +383,39 @@ export default function ContactsPage() {
 
       {/* Multi-Selection Bulk Action Banner */}
       {selectedIds.length > 0 && (
-        <div className="p-3 rounded-xl bg-indigo-950/60 border border-primary/30 flex items-center justify-between animate-in fade-in duration-150">
-          <div className="flex items-center gap-2 text-xs font-medium text-primary">
-            <span className="w-5 h-5 rounded-full bg-primary/20 text-primary flex items-center justify-center font-bold text-[10px]">
+        <div className="p-3 rounded-xl bg-card border border-border flex items-center justify-between shadow-sm animate-in fade-in duration-150">
+          <div className="flex items-center gap-2 text-xs font-medium text-foreground">
+            <span className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-[10px]">
               {selectedIds.length}
             </span>
-            <span>contacts selected</span>
+            <span>{selectedIds.length === 1 ? "1 contact selected" : `${selectedIds.length} contacts selected`}</span>
           </div>
 
           <div className="flex items-center gap-2">
-            <Link
-              href="/whatsapp/campaigns/new"
-              className="flex items-center gap-1.5 px-3 py-1 rounded-md bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-xs transition-colors"
-            >
-              <MessageSquare className="h-3.5 w-3.5" />
-              <span>Broadcast WhatsApp ({selectedIds.length})</span>
-            </Link>
+            {selectedIds.length === 1 ? (
+              <button
+                onClick={() => {
+                  const target = contacts.find((c) => c.id === selectedIds[0]);
+                  if (target) handleOpenSingleMessage(target);
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-slate-950 text-xs font-bold shadow-sm transition-all hover:scale-[1.01]"
+              >
+                <MessageSquare className="h-3.5 w-3.5 fill-slate-950" />
+                <span>Send WhatsApp to Selected Contact</span>
+              </button>
+            ) : (
+              <Link
+                href="/whatsapp/campaigns/new"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-slate-950 text-xs font-bold shadow-sm transition-all hover:scale-[1.01]"
+              >
+                <MessageSquare className="h-3.5 w-3.5 fill-slate-950" />
+                <span>Broadcast WhatsApp ({selectedIds.length})</span>
+              </Link>
+            )}
 
             <button
               onClick={handleDeleteSelected}
-              className="flex items-center gap-1 px-2.5 py-1 rounded-md bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 text-xs font-medium transition-colors"
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 text-xs font-medium transition-colors"
             >
               <Trash2 className="h-3 w-3" />
               <span>Delete</span>
@@ -512,21 +540,31 @@ export default function ContactsPage() {
 
                       <td className="py-3 px-4 text-foreground/90">
                         {contact.phone ? (
-                          <div className="space-y-0.5">
-                            <div className="flex items-center gap-1.5 font-mono text-[11px]">
-                              <Phone className="h-3 w-3 text-emerald-400" />
-                              <span>{contact.phone}</span>
+                          <div className="flex items-center justify-between gap-2 max-w-[200px]">
+                            <div className="space-y-0.5 min-w-0">
+                              <div className="flex items-center gap-1.5 font-mono text-[11px]">
+                                <Phone className="h-3 w-3 text-emerald-400 shrink-0" />
+                                <span className="truncate">{contact.phone}</span>
+                              </div>
+                              {contact.metadata?.is_whatsapp_eligible === true && (
+                                <div className="text-[9px] font-medium text-emerald-500 flex items-center gap-0.5">
+                                  <Check className="h-2 w-2" /> WhatsApp Ready
+                                </div>
+                              )}
+                              {contact.metadata?.phone_type === "landline" && (
+                                <div className="text-[9px] font-medium text-amber-500">
+                                  Landline (Voice only)
+                                </div>
+                              )}
                             </div>
-                            {contact.metadata?.is_whatsapp_eligible === true && (
-                              <div className="text-[9px] font-medium text-emerald-500 flex items-center gap-0.5">
-                                <Check className="h-2 w-2" /> WhatsApp Ready
-                              </div>
-                            )}
-                            {contact.metadata?.phone_type === "landline" && (
-                              <div className="text-[9px] font-medium text-amber-500">
-                                Landline (Voice only)
-                              </div>
-                            )}
+                            <button
+                              onClick={() => handleOpenSingleMessage(contact)}
+                              className="px-2 py-0.5 rounded-md text-[10px] font-bold text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/25 flex items-center gap-1 transition-all shrink-0 hover:scale-105"
+                              title="Chat on WhatsApp"
+                            >
+                              <MessageSquare className="h-2.5 w-2.5" />
+                              <span>Chat</span>
+                            </button>
                           </div>
                         ) : (
                           <span className="text-muted-foreground/60 italic">No phone</span>
@@ -574,15 +612,26 @@ export default function ContactsPage() {
                       </td>
 
                       <td className="py-3 px-4 text-right">
-                        <button
-                          onClick={() => {
-                            setContacts(contacts.filter((c) => c.id !== contact.id));
-                          }}
-                          className="p-1 rounded text-muted-foreground hover:text-rose-400 hover:bg-secondary transition-colors"
-                          title="Delete contact"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
+                        <div className="flex items-center justify-end gap-1">
+                          {contact.phone && (
+                            <button
+                              onClick={() => handleOpenSingleMessage(contact)}
+                              className="p-1.5 rounded-lg text-emerald-400 hover:bg-emerald-500/15 border border-emerald-500/20 transition-all"
+                              title="Send WhatsApp Message"
+                            >
+                              <MessageSquare className="h-3.5 w-3.5" />
+                            </button>
+                          )}
+                          <button
+                            onClick={() => {
+                              setContacts(contacts.filter((c) => c.id !== contact.id));
+                            }}
+                            className="p-1.5 rounded-lg text-muted-foreground hover:text-rose-400 hover:bg-secondary transition-colors"
+                            title="Delete contact"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -592,6 +641,162 @@ export default function ContactsPage() {
           </table>
         </div>
       </div>
+
+      {/* ========================================================= */}
+      {/* Single WhatsApp Message Modal (1:1 Direct Outreach)       */}
+      {/* ========================================================= */}
+      {singleMessageContact && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-in fade-in duration-150">
+          <div className="bg-card border border-border rounded-3xl w-full max-w-lg p-6 space-y-5 shadow-2xl relative">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-border/80 pb-3.5">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold">
+                  <MessageSquare className="h-4.5 w-4.5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+                    <span>Send WhatsApp Message</span>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 font-semibold border border-emerald-500/25">
+                      Direct 1:1
+                    </span>
+                  </h3>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">
+                    To: <strong className="text-foreground">{singleMessageContact.company || `${singleMessageContact.first_name || ""} ${singleMessageContact.last_name || ""}`.trim() || "Recipient"}</strong> ({singleMessageContact.phone})
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setSingleMessageContact(null)}
+                className="p-1 rounded-lg text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Quick Template Preset Chips */}
+            <div className="space-y-1.5">
+              <span className="text-[11px] font-semibold text-foreground/80">
+                Quick Preset Templates:
+              </span>
+              <div className="flex flex-wrap gap-1.5">
+                {[
+                  {
+                    label: "👋 Warm Greeting",
+                    text: `Assalamu Alaikum ${singleMessageContact.company || singleMessageContact.first_name || "there"},\n\nI found your business on Google Maps! How can I assist you today?`,
+                  },
+                  {
+                    label: "📋 Wholesale / Catalog",
+                    text: `Assalamu Alaikum ${singleMessageContact.company || singleMessageContact.first_name || "there"},\n\nWe offer direct wholesale supplies for ${(singleMessageContact.metadata as any)?.scraped_category || "businesses"}. Would you like me to send over our product catalog and price list?`,
+                  },
+                  {
+                    label: "⭐ Follow-up",
+                    text: `Hi ${singleMessageContact.company || singleMessageContact.first_name || "there"},\n\nJust following up on our previous conversation. Please let me know if you have any questions!`,
+                  },
+                ].map((preset) => (
+                  <button
+                    key={preset.label}
+                    type="button"
+                    onClick={() => setSingleMessageText(preset.text)}
+                    className="px-2.5 py-1 rounded-lg bg-secondary hover:bg-secondary/80 border border-border text-[11px] font-medium text-foreground transition-all hover:border-emerald-500/40"
+                  >
+                    {preset.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Message Body Input */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between text-xs">
+                <label className="font-semibold text-foreground/90">Message Copy</label>
+                <span className="text-[11px] text-muted-foreground font-mono">
+                  {singleMessageText.length} chars
+                </span>
+              </div>
+              <textarea
+                rows={5}
+                value={singleMessageText}
+                onChange={(e) => setSingleMessageText(e.target.value)}
+                className="w-full bg-background border border-border rounded-xl p-3 text-xs text-foreground leading-relaxed focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+                placeholder="Type your WhatsApp message..."
+              />
+            </div>
+
+            {/* Preview Bubble */}
+            <div className="bg-[#0b141a] p-3.5 rounded-2xl border border-border/80 shadow-inner space-y-1.5">
+              <div className="text-[10px] text-emerald-400 font-mono pb-1 border-b border-emerald-950 flex items-center justify-between">
+                <span>WhatsApp Preview</span>
+                <span>To: {singleMessageContact.phone}</span>
+              </div>
+              <div className="bg-[#005c4b] text-foreground p-3 rounded-xl rounded-tr-none text-xs leading-relaxed space-y-1">
+                <div className="whitespace-pre-line text-slate-100 text-[11px]">
+                  {singleMessageText || "Type message above..."}
+                </div>
+                <div className="text-[9px] text-emerald-200/70 text-right flex items-center justify-end gap-1">
+                  <span>Just now</span>
+                  <span className="text-cyan-300 font-bold">✓✓</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="space-y-2 pt-1 border-t border-border/70">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                {/* 1-Click WhatsApp Web Launcher */}
+                <button
+                  onClick={() => {
+                    const cleanPhone = (singleMessageContact.phone || "").replace(/[^0-9]/g, "");
+                    const url = `https://web.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(singleMessageText)}`;
+                    window.open(url, "_blank");
+                  }}
+                  className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-slate-950 text-xs font-bold flex items-center justify-center gap-2 shadow-md shadow-emerald-600/25 transition-all hover:scale-[1.01]"
+                >
+                  <ExternalLink className="h-3.5 w-3.5" />
+                  <span>Open in WhatsApp Web (Free)</span>
+                </button>
+
+                {/* Direct Mobile / wa.me Link */}
+                <button
+                  onClick={() => {
+                    const cleanPhone = (singleMessageContact.phone || "").replace(/[^0-9]/g, "");
+                    const waMe = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(singleMessageText)}`;
+                    window.open(waMe, "_blank");
+                  }}
+                  className="w-full py-2.5 px-4 rounded-xl bg-secondary hover:bg-secondary/80 border border-border text-foreground text-xs font-semibold flex items-center justify-center gap-1.5 transition-all"
+                >
+                  <Phone className="h-3.5 w-3.5 text-emerald-400" />
+                  <span>Launch wa.me Mobile</span>
+                </button>
+              </div>
+
+              <div className="flex items-center justify-between text-[11px] text-muted-foreground pt-1">
+                <button
+                  onClick={() => {
+                    const cleanPhone = (singleMessageContact.phone || "").replace(/[^0-9]/g, "");
+                    const waMe = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(singleMessageText)}`;
+                    navigator.clipboard.writeText(waMe);
+                    setSingleMessageCopied(true);
+                    setTimeout(() => setSingleMessageCopied(false), 2000);
+                  }}
+                  className="text-primary hover:underline flex items-center gap-1"
+                >
+                  {singleMessageCopied ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3" />}
+                  <span>{singleMessageCopied ? "Link Copied to Clipboard!" : "Copy Click-to-Chat Link"}</span>
+                </button>
+
+                <button
+                  onClick={() => setSingleMessageContact(null)}
+                  className="text-muted-foreground hover:text-foreground"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Add Contact Modal Dialog */}
       {isAddModalOpen && (

@@ -59,9 +59,10 @@ const navItems: NavItem[] = [
   },
   {
     title: "WhatsApp",
-    href: "/whatsapp/campaigns",
+    href: "/whatsapp/inbox",
     icon: MessageSquare,
     children: [
+      { title: "Shared Inbox", href: "/whatsapp/inbox" },
       { title: "Campaigns", href: "/whatsapp/campaigns" },
       { title: "Templates", href: "/whatsapp/templates" },
       { title: "Configuration", href: "/whatsapp/config" },

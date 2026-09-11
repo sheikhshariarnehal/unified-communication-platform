@@ -6,6 +6,7 @@ import { CollectionsManager } from './components/CollectionsManager';
 import { SettingsView } from './components/SettingsView';
 import { LeadDetailModal } from './components/LeadDetailModal';
 import { ExportModal } from './components/ExportModal';
+import { PlatformSyncDock } from './components/PlatformSyncDock';
 import { ExtensionStatus, RuntimeMessage } from '../types/messages';
 import { Lead, Collection, CollectionHistory, AppSettings } from '../types/lead';
 import { getAllLeads, deleteLeads, deleteLead } from '../database/leads';
@@ -25,9 +26,9 @@ const INITIAL_STATUS: ExtensionStatus = {
     isConnected: false,
     searchQuery: '',
     isDetailPage: false,
-    activeListingCount: 0
+    activeListingCount: 0,
   },
-  autoScrollActive: false
+  autoScrollActive: false,
 };
 
 export const App: React.FC = () => {
@@ -40,11 +41,12 @@ export const App: React.FC = () => {
     collectionMode: 'search_results',
     globalDeduplication: true,
     autoScrollAssist: true,
-    autoScrollSpeed: 1200
+    autoScrollSpeed: 1200,
   });
 
   // Modals & Selections
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
+  const [selectedLeadIds, setSelectedLeadIds] = useState<string[]>([]);
   const [isExportOpen, setIsExportOpen] = useState(false);
   const [exportSelectedOnly, setExportSelectedOnly] = useState(false);
   const [filterCollectionId, setFilterCollectionId] = useState('all');
@@ -56,7 +58,7 @@ export const App: React.FC = () => {
         getAllLeads(),
         getCollections(),
         getCollectionHistory(),
-        getSettings()
+        getSettings(),
       ]);
       setLeads(allLeads);
       setCollections(allCols);
@@ -73,8 +75,7 @@ export const App: React.FC = () => {
       chrome.runtime.sendMessage({ type: 'GET_STATUS' } as RuntimeMessage, (res: ExtensionStatus) => {
         if (chrome.runtime.lastError) return;
         if (res) {
-          setStatus(prev => {
-            // If lead count changed, trigger DB reload
+          setStatus((prev) => {
             if (res.leadsCollectedThisSession !== prev.leadsCollectedThisSession) {
               refreshDatabase();
             }
@@ -94,13 +95,16 @@ export const App: React.FC = () => {
 
   // Actions
   const handleStart = (collectionName: string) => {
-    chrome.runtime.sendMessage({
-      type: 'START_COLLECTION',
-      payload: { name: collectionName }
-    } as RuntimeMessage, () => {
-      pollStatus();
-      refreshDatabase();
-    });
+    chrome.runtime.sendMessage(
+      {
+        type: 'START_COLLECTION',
+        payload: { name: collectionName },
+      } as RuntimeMessage,
+      () => {
+        pollStatus();
+        refreshDatabase();
+      }
+    );
   };
 
   const handlePause = () => {
@@ -123,12 +127,15 @@ export const App: React.FC = () => {
   };
 
   const handleToggleAutoScroll = (enabled: boolean) => {
-    chrome.runtime.sendMessage({
-      type: 'TOGGLE_AUTO_SCROLL',
-      payload: { enabled }
-    } as RuntimeMessage, () => {
-      setStatus(prev => ({ ...prev, autoScrollActive: enabled }));
-    });
+    chrome.runtime.sendMessage(
+      {
+        type: 'TOGGLE_AUTO_SCROLL',
+        payload: { enabled },
+      } as RuntimeMessage,
+      () => {
+        setStatus((prev) => ({ ...prev, autoScrollActive: enabled }));
+      }
+    );
   };
 
   const handleDeleteLeads = async (ids: string[]) => {
@@ -157,7 +164,7 @@ export const App: React.FC = () => {
   };
 
   const handleClearAllData = async () => {
-    await deleteLeads(leads.map(l => l.id));
+    await deleteLeads(leads.map((l) => l.id));
     for (const c of collections) {
       await deleteCollection(c.id);
     }
@@ -165,11 +172,16 @@ export const App: React.FC = () => {
   };
 
   const handleExportFullBackup = () => {
-    exportToJson(leads, AVAILABLE_FIELDS.map(f => f.key), `leadmap-full-backup-${Date.now()}`);
+    exportToJson(leads, AVAILABLE_FIELDS.map((f) => f.key), `leadmap-full-backup-${Date.now()}`);
   };
 
+  const activeCollectionName =
+    collections.find((c) => c.id === filterCollectionId)?.name ||
+    status.activeCollectionName ||
+    (status.searchQuery ? `Search - ${status.searchQuery}` : undefined);
+
   return (
-    <div className="flex flex-col h-screen w-full bg-slate-50 text-slate-800 antialiased select-none">
+    <div className="flex flex-col h-screen w-full bg-slate-50 text-slate-800 antialiased select-none overflow-hidden">
       {/* Global Navigation Header */}
       <Header
         activeTab={activeTab}
@@ -178,7 +190,7 @@ export const App: React.FC = () => {
         totalLeadsCount={leads.length}
       />
 
-      {/* Main Content Area */}
+      {/* Main Tab Content */}
       <main className="flex-1 overflow-y-auto">
         {activeTab === 'collector' && (
           <LiveCollector
@@ -194,6 +206,8 @@ export const App: React.FC = () => {
               setExportSelectedOnly(false);
               setIsExportOpen(true);
             }}
+            onViewLead={setSelectedLead}
+            totalStoredLeads={leads.length}
           />
         )}
 
@@ -209,6 +223,7 @@ export const App: React.FC = () => {
               setIsExportOpen(true);
             }}
             onViewLead={setSelectedLead}
+            onSelectLeadsChange={setSelectedLeadIds}
           />
         )}
 
@@ -237,6 +252,14 @@ export const App: React.FC = () => {
         )}
       </main>
 
+      {/* Unified Platform Push Dock (persistent at bottom of main views, never overlapping modals) */}
+      <PlatformSyncDock
+        leads={leads}
+        selectedCount={activeTab === 'leads' ? selectedLeadIds.length : 0}
+        collectionName={activeCollectionName}
+        onOpenSettings={() => setActiveTab('settings')}
+      />
+
       {/* Detail Slide-over Modal */}
       <LeadDetailModal
         lead={selectedLead}
@@ -247,8 +270,8 @@ export const App: React.FC = () => {
       {/* Export Dialog Modal */}
       <ExportModal
         leads={leads}
-        selectedLeadIds={exportSelectedOnly ? [] : []}
-        collectionName={collections.find(c => c.id === filterCollectionId)?.name}
+        selectedLeadIds={exportSelectedOnly ? selectedLeadIds : []}
+        collectionName={activeCollectionName}
         isOpen={isExportOpen}
         onClose={() => setIsExportOpen(false)}
       />

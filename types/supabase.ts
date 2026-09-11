@@ -1000,6 +1000,249 @@ export type Database = {
         }
         Relationships: []
       }
+      conversations: {
+        Row: {
+          assigned_agent_id: string | null
+          contact_id: string
+          created_at: string | null
+          id: string
+          last_message_at: string | null
+          last_message_text: string | null
+          status: string
+          unread_count: number | null
+          updated_at: string | null
+          workspace_id: string
+        }
+        Insert: {
+          assigned_agent_id?: string | null
+          contact_id: string
+          created_at?: string | null
+          id?: string
+          last_message_at?: string | null
+          last_message_text?: string | null
+          status?: string
+          unread_count?: number | null
+          updated_at?: string | null
+          workspace_id: string
+        }
+        Update: {
+          assigned_agent_id?: string | null
+          contact_id?: string
+          created_at?: string | null
+          id?: string
+          last_message_at?: string | null
+          last_message_text?: string | null
+          status?: string
+          unread_count?: number | null
+          updated_at?: string | null
+          workspace_id?: string
+        }
+        Relationships: []
+      }
+      messages: {
+        Row: {
+          content_text: string | null
+          content_type: string
+          conversation_id: string
+          created_at: string | null
+          error_message: string | null
+          id: string
+          media_type: string | null
+          media_url: string | null
+          message_id: string | null
+          sender_id: string | null
+          sender_type: string
+          status: string
+          template_name: string | null
+          workspace_id: string
+        }
+        Insert: {
+          content_text?: string | null
+          content_type?: string
+          conversation_id: string
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          media_type?: string | null
+          media_url?: string | null
+          message_id?: string | null
+          sender_id?: string | null
+          sender_type: string
+          status?: string
+          template_name?: string | null
+          workspace_id: string
+        }
+        Update: {
+          content_text?: string | null
+          content_type?: string
+          conversation_id?: string
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          media_type?: string | null
+          media_url?: string | null
+          message_id?: string | null
+          sender_id?: string | null
+          sender_type?: string
+          status?: string
+          template_name?: string | null
+          workspace_id?: string
+        }
+        Relationships: []
+      }
+      broadcasts: {
+        Row: {
+          audience_filter: Json | null
+          created_at: string | null
+          delivered_count: number | null
+          failed_count: number | null
+          id: string
+          name: string
+          read_count: number | null
+          replied_count: number | null
+          scheduled_at: string | null
+          sent_count: number | null
+          status: string
+          template_language: string
+          template_name: string
+          template_variables: Json | null
+          total_recipients: number | null
+          updated_at: string | null
+          workspace_id: string
+        }
+        Insert: {
+          audience_filter?: Json | null
+          created_at?: string | null
+          delivered_count?: number | null
+          failed_count?: number | null
+          id?: string
+          name: string
+          read_count?: number | null
+          replied_count?: number | null
+          scheduled_at?: string | null
+          sent_count?: number | null
+          status?: string
+          template_language?: string
+          template_name: string
+          template_variables?: Json | null
+          total_recipients?: number | null
+          updated_at?: string | null
+          workspace_id: string
+        }
+        Update: {
+          audience_filter?: Json | null
+          created_at?: string | null
+          delivered_count?: number | null
+          failed_count?: number | null
+          id?: string
+          name?: string
+          read_count?: number | null
+          replied_count?: number | null
+          scheduled_at?: string | null
+          sent_count?: number | null
+          status?: string
+          template_language?: string
+          template_name?: string
+          template_variables?: Json | null
+          total_recipients?: number | null
+          updated_at?: string | null
+          workspace_id?: string
+        }
+        Relationships: []
+      }
+      broadcast_recipients: {
+        Row: {
+          broadcast_id: string
+          contact_id: string
+          created_at: string | null
+          delivered_at: string | null
+          error_message: string | null
+          id: string
+          params: Json | null
+          phone: string | null
+          read_at: string | null
+          replied_at: string | null
+          sent_at: string | null
+          status: string
+          whatsapp_message_id: string | null
+          workspace_id: string
+        }
+        Insert: {
+          broadcast_id: string
+          contact_id: string
+          created_at?: string | null
+          delivered_at?: string | null
+          error_message?: string | null
+          id?: string
+          params?: Json | null
+          phone?: string | null
+          read_at?: string | null
+          replied_at?: string | null
+          sent_at?: string | null
+          status?: string
+          whatsapp_message_id?: string | null
+          workspace_id: string
+        }
+        Update: {
+          broadcast_id?: string
+          contact_id?: string
+          created_at?: string | null
+          delivered_at?: string | null
+          error_message?: string | null
+          id?: string
+          params?: Json | null
+          phone?: string | null
+          read_at?: string | null
+          replied_at?: string | null
+          sent_at?: string | null
+          status?: string
+          whatsapp_message_id?: string | null
+          workspace_id?: string
+        }
+        Relationships: []
+      }
+      whatsapp_config: {
+        Row: {
+          access_token: string
+          app_secret: string | null
+          connected_at: string | null
+          created_at: string | null
+          id: string
+          phone_number_id: string
+          status: string
+          updated_at: string | null
+          verify_token: string | null
+          waba_id: string | null
+          workspace_id: string
+        }
+        Insert: {
+          access_token: string
+          app_secret?: string | null
+          connected_at?: string | null
+          created_at?: string | null
+          id?: string
+          phone_number_id: string
+          status?: string
+          updated_at?: string | null
+          verify_token?: string | null
+          waba_id?: string | null
+          workspace_id: string
+        }
+        Update: {
+          access_token?: string
+          app_secret?: string | null
+          connected_at?: string | null
+          created_at?: string | null
+          id?: string
+          phone_number_id?: string
+          status?: string
+          updated_at?: string | null
+          verify_token?: string | null
+          waba_id?: string | null
+          workspace_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

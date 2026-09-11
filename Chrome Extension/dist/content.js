@@ -90,6 +90,27 @@
     if (lead.rating) score += 10;
     return Math.min(100, score);
   }
+  function cleanAddress(rawAddress, businessName, category) {
+    if (!rawAddress) return void 0;
+    let cleaned = cleanText(rawAddress);
+    if (businessName && cleaned.toLowerCase().startsWith(businessName.toLowerCase())) {
+      cleaned = cleaned.substring(businessName.length).trim();
+    }
+    cleaned = cleaned.replace(/\b\d+\.\d+\s*\([\d,.]+\)/g, "").replace(/\b\d+\s*\([\d,.]+\)/g, "").replace(/\bNo reviews\b/gi, "").replace(/\b(Open 24 hours|Open ⋅ Closes \d+.*|Open|Closed)\b/gi, "").replace(/^[·, -]+/, "").replace(/[·, -]+$/, "").trim();
+    if (category) {
+      const cleanCat = category.trim().toLowerCase();
+      if (cleaned.toLowerCase() === cleanCat) {
+        return void 0;
+      }
+      if (cleaned.toLowerCase().startsWith(cleanCat)) {
+        cleaned = cleaned.substring(cleanCat.length).replace(/^[·, -]+/, "").trim();
+      }
+    }
+    if (!cleaned || cleaned.length < 3 || /^\d+$/.test(cleaned)) {
+      return void 0;
+    }
+    return cleaned;
+  }
 
   // src/content/extractor.ts
   function extractLeadFromListingElement(element, collectionId, searchQuery) {
@@ -219,7 +240,7 @@
         phone,
         normalizedPhone,
         website,
-        address,
+        address: cleanAddress(address, businessName, category),
         mapsUrl,
         businessStatus,
         latitude: coords.lat,

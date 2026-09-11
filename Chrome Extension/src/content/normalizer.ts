@@ -139,3 +139,48 @@ export function calculateConfidenceScore(lead: Partial<Lead>): number {
   if (lead.rating) score += 10;
   return Math.min(100, score);
 }
+
+/**
+ * Sanitizes scraped address string, stripping duplicated business names, ratings, and junk text.
+ */
+export function cleanAddress(
+  rawAddress?: string | null,
+  businessName?: string,
+  category?: string
+): string | undefined {
+  if (!rawAddress) return undefined;
+  let cleaned = cleanText(rawAddress);
+
+  // If address starts with business name, remove it
+  if (businessName && cleaned.toLowerCase().startsWith(businessName.toLowerCase())) {
+    cleaned = cleaned.substring(businessName.length).trim();
+  }
+
+  // Remove rating & review junk like "3.9(1,800)", "4.6(27)", "No reviews", "5.0(1)"
+  cleaned = cleaned
+    .replace(/\b\d+\.\d+\s*\([\d,.]+\)/g, '')
+    .replace(/\b\d+\s*\([\d,.]+\)/g, '')
+    .replace(/\bNo reviews\b/gi, '')
+    .replace(/\b(Open 24 hours|Open ⋅ Closes \d+.*|Open|Closed)\b/gi, '')
+    .replace(/^[·, -]+/, '')
+    .replace(/[·, -]+$/, '')
+    .trim();
+
+  // If what remains is just the category, strip it
+  if (category) {
+    const cleanCat = category.trim().toLowerCase();
+    if (cleaned.toLowerCase() === cleanCat) {
+      return undefined;
+    }
+    if (cleaned.toLowerCase().startsWith(cleanCat)) {
+      cleaned = cleaned.substring(cleanCat.length).replace(/^[·, -]+/, '').trim();
+    }
+  }
+
+  // If what remains is empty or shorter than 3 chars or only digits
+  if (!cleaned || cleaned.length < 3 || /^\d+$/.test(cleaned)) {
+    return undefined;
+  }
+
+  return cleaned;
+}

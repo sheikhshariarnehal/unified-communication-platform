@@ -7,8 +7,7 @@
     "storage",
     "sidePanel",
     "tabs",
-    "activeTab",
-    "cookies"
+    "activeTab"
   ],
   "host_permissions": [
     "https://*.google.com/maps*",
