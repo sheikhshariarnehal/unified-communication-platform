@@ -116,10 +116,38 @@ export async function POST(request: NextRequest) {
                 .eq("whatsapp_message_id", wamid);
 
               // Also update in campaign_recipients if exists
-              await supabase
+              const { data: updatedRecips } = await supabase
                 .from("campaign_recipients")
                 .update(updateRecip)
-                .eq("provider_message_id", wamid);
+                .eq("provider_message_id", wamid)
+                .select("campaign_id");
+
+              if (updatedRecips && updatedRecips.length > 0 && newStatus === "failed") {
+                for (const r of updatedRecips) {
+                  if (r.campaign_id) {
+                    const { data: c } = await supabase
+                      .from("campaigns")
+                      .select("stats")
+                      .eq("id", r.campaign_id)
+                      .maybeSingle();
+
+                    if (c) {
+                      const st = (c.stats as any) || { sent: 0, failed: 0, delivered: 0 };
+                      await supabase
+                        .from("campaigns")
+                        .update({
+                          status: "failed",
+                          stats: {
+                            ...st,
+                            failed: (st.failed || 0) + 1,
+                            delivered: Math.max(0, (st.delivered || 0) - 1),
+                          },
+                        })
+                        .eq("id", r.campaign_id);
+                    }
+                  }
+                }
+              }
             }
           }
 
